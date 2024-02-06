@@ -1,0 +1,7 @@
+fn func() {
+    let x = 1;
+    while balbul <= 123 {
+        x = x + 1;
+
+    }
+}
