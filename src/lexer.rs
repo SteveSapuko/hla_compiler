@@ -1,4 +1,5 @@
 use fancy_regex::Regex; 
+use crate::definitions::*;
 
 pub struct Lexer {
     data: String,
@@ -62,31 +63,31 @@ impl Lexer {
             self.ptr = self.skip_whitespace();            
 
             if let Some(m) = reg_key.find(&self.data.as_str()[self.ptr..]).unwrap() {
-                token_list.push(Token::Key(m.as_str()));
+                token_list.push(Token::Key(m.as_str().to_string()));
                 self.ptr += m.as_str().len();
                 continue;
             }
 
             if let Some(m) = reg_op.find(&self.data.as_str()[self.ptr..]).unwrap() {
-                token_list.push(Token::Op(m.as_str()));
+                token_list.push(Token::Op(m.as_str().to_string()));
                 self.ptr += m.as_str().len();
                 continue;
             }
 
             if let Some(m) = reg_cond.find(&self.data.as_str()[self.ptr..]).unwrap() {
-                token_list.push(Token::Cond(m.as_str()));
+                token_list.push(Token::Cond(m.as_str().to_string()));
                 self.ptr += m.as_str().len();
                 continue;
             }
 
             if let Some(m) = reg_id.find(&self.data.as_str()[self.ptr..]).unwrap() {
-                token_list.push(Token::Id(m.as_str()));
+                token_list.push(Token::Id(m.as_str().to_string()));
                 self.ptr += m.as_str().len();
                 continue;
             }
 
             if let Some(m) = reg_lit.find(&self.data.as_str()[self.ptr..]).unwrap() {
-                token_list.push(Token::Lit(m.as_str()));
+                token_list.push(Token::Lit(m.as_str().to_string()));
                 self.ptr += m.as_str().len();
                 continue;
             }
@@ -106,6 +107,7 @@ impl Lexer {
             return Err(self.ptr);
         }
 
+        token_list.push(Token::EOF);
         return Ok(token_list);
     }
 
@@ -128,20 +130,3 @@ impl Lexer {
 }
 
 
-#[derive(Debug)]
-pub enum Token <'a> {
-    Key(&'a str),
-    Op(&'a str),
-    Cond(&'a str),
-    Id(&'a str),
-    Lit(&'a str),
-    ParenOpen,
-    ParenClose,
-    SquareOpen,
-    SquareClose,
-    CurlyOpen,
-    CurlyClose,
-    SemiCol,
-    Col,
-    Arrow,
-}
