@@ -38,7 +38,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "hls_compiler"
+name = "hla_compiler"
 version = "0.1.0"
 dependencies = [
  "fancy-regex",

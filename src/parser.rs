@@ -1,10 +1,10 @@
 use crate::definitions::*;
-use crate::expression::*;
+use crate::statement::*;
 
 #[derive(Debug)]
 pub struct Parser{
     tokens: Vec<Token>,
-    ptr: usize,
+    pub ptr: usize,
 }
 
 impl Parser {
@@ -27,9 +27,13 @@ impl Parser {
     }
 
 
-    pub fn parse(&mut self) -> Expr {
-        let mut e = new_expr('B');
-        e = e.eval(self);
-        e
+    pub fn parse(&mut self) -> Result<Vec<Statement>, &'static str> {
+        let mut program: Vec<Statement> = vec![];
+        
+        while self.peek(0) != Token::EOF {
+            program.push( new_statement('0').parse(self)?);
+        }
+
+        Ok(program)
     }
 }
