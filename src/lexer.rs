@@ -65,6 +65,8 @@ impl Lexer {
             //self.ptr = self.skip_whitespace()?;
             self.skip_whitespace();
 
+            //println!("ptr: {}   char: {}", self.ptr, self.data.as_bytes()[self.ptr] as char);
+
             if let Some(m) = reg_key.find(&self.data.as_str()[self.ptr..]).unwrap() {
                 token_list.push(Token::Key(m.as_str().to_string()));
                 token_pos.push(self.ptr);

@@ -31,7 +31,7 @@ impl Parser {
         let mut program: Vec<Statement> = vec![];
         
         while self.peek(0) != Token::EOF {
-            program.push( new_statement('0').parse(self)?);
+            program.push( new_statement("Base").parse(self)?);
         }
 
         Ok(program)

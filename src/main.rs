@@ -32,13 +32,14 @@ fn main() {
 
      if let Err(e) = ast {
           let (line, col) = find_relative_pos(token_pos[parser.ptr - 1], text);
-          println!("ERROR - {} - at Ln: {} Col: {} - Token: {}\n", e, line, col, tokens[parser.ptr - 1]);
+          println!("PARSING ERROR - {} - at Ln: {} Col: {} - Token: {}\n", e, line, col, tokens[parser.ptr - 1]);
           std::process::exit(-1);
      }
 
-     for s in ast.unwrap() {
+     for s in ast.clone().unwrap() {
           println!("{}", s);
      }
+     
 
 }
 
@@ -49,8 +50,10 @@ fn find_relative_pos(target: usize, f: String) -> (usize, usize) {
      //println!("Target - {}", target);
 
      for line in f.lines().into_iter().enumerate() {
-          let line_n = line.0;
-          let line = line.1;
+          let line_n = line.0; 
+          let mut line = line.1.to_string();
+          line.push('\0'); //to accomodate the fact that \n is not included
+          //println!("{}", line);
 
           for c in line.as_bytes().into_iter().enumerate() {
                let pos_in_line = c.0;

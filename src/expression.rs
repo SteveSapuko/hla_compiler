@@ -11,6 +11,7 @@ pub enum Expr {
     Term(Box<BinaryExpr>),
     Shift(Box<BinaryExpr>),
     Unary(Box<UnaryExpr>),
+    Cast(Box<Cast>),
     Primary(Box<PrimaryExpr>),
 }
 
@@ -33,51 +34,62 @@ pub struct UnaryExpr {
     operator: Token,
     right: Expr
 }
+#[derive(Clone, Debug)]
+pub struct Cast {
+    value: Expr,
+    to_type: Token
+}
 
-pub fn new_expr(t: char) -> Expr {
+pub fn new_expr(t: &'static str) -> Expr {
     match t {
-        'B' => Expr::Base,
-        'A' => Expr::Assign(Box::new(BinaryExpr{
-            left: new_expr('E'),
+        "Base" => Expr::Base,
+        "Assign" => Expr::Assign(Box::new(BinaryExpr{
+            left: new_expr("Expr"),
             operator: Token::Op("=".to_string()),
-            right: new_expr('E'),}
+            right: new_expr("Expr"),}
         )),
-        'E' => Expr::Equality(Box::new(
+        "Expr" => Expr::Equality(Box::new(
             BinaryExpr {
-                left: new_expr('C'),
+                left: new_expr("Comp"),
                 operator: Token::Arrow,
-                right: new_expr('C'),
+                right: new_expr("Comp"),
             }
         )),
-        'C' => Expr::Comparison(Box::new(
+        "Comp" => Expr::Comparison(Box::new(
             BinaryExpr {
-                left: new_expr('T'),
+                left: new_expr("Term"),
                 operator: Token::Arrow,
-                right: new_expr('T'),
+                right: new_expr("Term"),
             }
         )),
-        'T' => Expr::Term(Box::new(
+        "Term" => Expr::Term(Box::new(
             BinaryExpr {
-                left: new_expr('S'),
+                left: new_expr("Shift"),
                 operator: Token::Arrow,
-                right: new_expr('S'),
+                right: new_expr("Shift"),
             }
         )),
-        'S' => Expr::Shift(Box::new(
+        "Shift" => Expr::Shift(Box::new(
             BinaryExpr {
-                left: new_expr('U'),
+                left: new_expr("Unary"),
                 operator: Token::Arrow,
-                right: new_expr('P')
+                right: new_expr("Primary")
             }
         )),
-        'U' => Expr::Unary(Box::new(
+        "Unary" => Expr::Unary(Box::new(
             UnaryExpr {
                 operator: Token::Arrow,
-                right: new_expr('P'),
+                right: new_expr("Primary"),
             }
         )),
-        'P' => Expr::Primary(Box::new(PrimaryExpr::Literal(String::new()))),
-        _ => panic!("new_expr invalid syntax")
+
+        "Cast" => Expr::Cast(Box::new(Cast {
+            value: new_expr("Base"),
+            to_type: Token::Arrow
+        })),
+
+        "Primary" => Expr::Primary(Box::new(PrimaryExpr::Literal(String::new()))),
+        _ => panic!("new_expr invalid syntax -- {}", t)
     }
 }
 
@@ -85,16 +97,16 @@ impl Expr {
     pub fn parse(&mut self, p: &mut Parser) -> Result<Expr, &'static str> {
         *self = match self {
             Expr::Base => {
-                let mut e = new_expr('A');
+                let mut e = new_expr("Assign");
                 e.parse(p)?
             }
 
             Expr::Assign(_) => {
-                let mut e = new_expr('E').parse(p)?;
+                let mut e = new_expr("Expr").parse(p)?;
 
                 if Token::Op("=".to_string()) == p.peek(0) {
                     p.advance();
-                    let right = new_expr('B').parse(p)?;
+                    let right = new_expr("Base").parse(p)?;
 
                     e = Expr::Assign(Box::new(BinaryExpr {
                         left: e,
@@ -106,7 +118,7 @@ impl Expr {
             }
 
             Expr::Equality(_) => {
-                let mut e = new_expr('C');
+                let mut e = new_expr("Comp");
                 e.parse(p)?;
                 
 
@@ -117,7 +129,7 @@ impl Expr {
                     let new_operator = p.peek(0);
                     p.advance();
 
-                    let mut r = new_expr('C');
+                    let mut r = new_expr("Comp");
                     r.parse(p)?;
 
                     e = Expr::Equality(Box::new(
@@ -132,7 +144,7 @@ impl Expr {
             }
 
             Expr::Comparison(_) => {
-                let mut e = new_expr('T');
+                let mut e = new_expr("Term");
                 e.parse(p)?;
 
                 while if let Token::Cond(d) = p.peek(0) {
@@ -143,7 +155,7 @@ impl Expr {
                     let new_operator = p.peek(0);
                     p.advance();
 
-                    let mut r = new_expr('T');
+                    let mut r = new_expr("Term");
                     r.parse(p)?;
 
                     e = Expr::Comparison(Box::new(
@@ -158,7 +170,7 @@ impl Expr {
             }
         
             Expr::Term(_) => {
-                let mut e = new_expr('S');
+                let mut e = new_expr("Shift");
                 e.parse(p)?;
 
                 while if let Token::Op(d) = p.peek(0) {
@@ -168,7 +180,7 @@ impl Expr {
                     let new_operator = p.peek(0);
                     p.advance();
 
-                    let mut r = new_expr('S');
+                    let mut r = new_expr("Shift");
                     r.parse(p)?;
 
                     e = Expr::Term(Box::new(
@@ -183,7 +195,7 @@ impl Expr {
             }
         
             Expr::Shift(_) => {
-                let mut e = new_expr('U');
+                let mut e = new_expr("Unary");
                 e.parse(p)?;
 
                 while if let Token::Op(d) = p.peek(0) {
@@ -193,7 +205,7 @@ impl Expr {
                     let new_operator = p.peek(0);
                     p.advance();
 
-                    let mut r = new_expr('P');
+                    let mut r = new_expr("Primary");
                     r.parse(p)?;
 
                     e = Expr::Term(Box::new(
@@ -214,7 +226,7 @@ impl Expr {
                         new_operator = p.peek(0);
                         p.advance();
                         
-                        let mut r = new_expr('P');
+                        let mut r = new_expr("Cast");
                         r.parse(p)?;
                         
                         break 'b Expr::Unary(Box::new(
@@ -226,13 +238,36 @@ impl Expr {
                     } 
                 }
 
-                let mut e = new_expr('P');
+                let mut e = new_expr("Cast");
                 e.parse(p)?
             }
         
+            Expr::Cast(_) => 'b: {
+                let v = new_expr("Primary").parse(p)?;
+
+                if p.peek(0) == Token::Op("as".to_string()) {
+                    p.advance();
+
+                    if !matches!(p.peek(0), Token::Id(_)) {
+                        return Err("Expected Identifier for Cast Type")
+                    }
+
+                    p.advance();
+
+                    break 'b Expr::Cast(Box::new(
+                        Cast {
+                            value: v,
+                            to_type: p.peek(-1)
+                        }
+                    ))
+                }
+
+                v
+            }
+
             Expr::Primary(_) => 'b: {
                 if let Token::ParenOpen = p.peek(0) {
-                    let mut e = new_expr('B');
+                    let mut e = new_expr("Base");
                     p.advance();
                     e.parse(p)?;
 
@@ -285,6 +320,7 @@ impl std::fmt::Display for Expr {
             Self::Term(d) => write!(f, "({} {} {})", d.left, d.operator, d.right),
             Self::Shift(d) => write!(f, "({} {} {})", d.left, d.operator, d.right),
             Self::Unary(d) => write!(f, "({} {})", d.operator, d.right),
+            Self::Cast(d) => write!(f, "({} cast to {})", d.value, d.to_type),
             Self::Primary(d) => {
                 match *d.clone() {
                     PrimaryExpr::Grouping(v) => write!(f, "({})", v),
