@@ -1,4 +1,4 @@
-use super::statement::*;
+/*use super::statement::*;
 use super::expression::*;
 
 pub fn syntaxCheck(ast: Vec<Statement>) -> Result<(), ()> {
@@ -70,4 +70,4 @@ enum ScopeStackOp {
 struct VarData {
     name: String,
     v_type: String,
-}
+}*/

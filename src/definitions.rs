@@ -1,5 +1,11 @@
 #[derive(Debug, Clone, PartialEq)]
-pub enum Token {
+pub struct Token {
+    pub ttype: TokenType,
+    pub pos: usize,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum TokenType {
     Key(String),
     Op(String),
     Cond(String),
@@ -17,20 +23,20 @@ pub enum Token {
     EOF,
 }
 
-impl Token {
+impl TokenType {
     pub fn data(&self) -> Option<String>{
         match self {
-            Token::Key(d) => Some(d.clone()),
-            Token::Op(d) => Some(d.clone()),
-            Token::Cond(d) => Some(d.clone()),
-            Token::Id(d) => Some(d.clone()),
-            Token::Lit(d) => Some(d.clone()),
+            TokenType::Key(d) => Some(d.clone()),
+            TokenType::Op(d) => Some(d.clone()),
+            TokenType::Cond(d) => Some(d.clone()),
+            TokenType::Id(d) => Some(d.clone()),
+            TokenType::Lit(d) => Some(d.clone()),
             _ => None
         }
     }
 }
 
-impl std::fmt::Display for Token {
+impl std::fmt::Display for TokenType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Key(d) => write!(f, "{}", d),

@@ -3,7 +3,7 @@ use crate::statement::*;
 
 #[derive(Debug)]
 pub struct Parser{
-    tokens: Vec<Token>,
+    pub tokens: Vec<Token>,
     pub ptr: usize,
 }
 
@@ -30,7 +30,7 @@ impl Parser {
     pub fn parse(&mut self) -> Result<Vec<Statement>, &'static str> {
         let mut program: Vec<Statement> = vec![];
         
-        while self.peek(0) != Token::EOF {
+        while self.peek(0).ttype != TokenType::EOF {
             program.push( new_statement("Base").parse(self)?);
         }
 

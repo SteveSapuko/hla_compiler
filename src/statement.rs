@@ -66,7 +66,7 @@ impl Statement {
             Statement::Base => new_statement("Declr").parse(p)?,
 
             Statement::Declr => 'b: {
-                if p.peek(0) == Token::Key("let".to_string())  {
+                if p.peek(0).ttype == TokenType::Key("let".to_string())  {
                     p.advance();
                     break 'b new_statement("VarDeclr").parse(p)?
                 }
@@ -75,33 +75,33 @@ impl Statement {
             }
 
             Statement::VarDeclr(_) => {
-                if !matches!(p.peek(0), Token::Id(_)) {
+                if !matches!(p.peek(0).ttype, TokenType::Id(_)) {
                     return Err("Expected Identifier for Variable Name")
                 }
 
-                let name = p.peek(0).data().expect("id needs string");
+                let name = p.peek(0).ttype.data().expect("id needs string");
                 p.advance();
 
-                if !matches!(p.peek(0), Token::Col) {
+                if !matches!(p.peek(0).ttype, TokenType::Col) {
                     return Err("Expected Colon After Variable Name")
                 }
                 p.advance();
 
-                if !matches!(p.peek(0), Token::Id(_)) {
+                if !matches!(p.peek(0).ttype, TokenType::Id(_)) {
                     return Err("Expected Identifier for Variable Type")
                 }
 
-                let vtype = p.peek(0).data().unwrap();
+                let vtype = p.peek(0).ttype.data().unwrap();
                 p.advance();
 
                 let mut value = None;
-                if p.peek(0) == Token::Op("=".to_string()) {
+                if p.peek(0).ttype == TokenType::Op("=".to_string()) {
                     p.advance();
                     let temp = new_expr("Base").parse(p)?;
                     value = Some(temp);
                 }
 
-                if !matches!(p.peek(0), Token::SemiCol) {
+                if !matches!(p.peek(0).ttype, TokenType::SemiCol) {
                     return Err("Expected Semicolon after Declaration")
                 }
                 
@@ -114,34 +114,40 @@ impl Statement {
                 }
 
             Statement::Stmt => 'b: {
-                if matches!(p.peek(0), Token::CurlyOpen) {
+                if matches!(p.peek(0).ttype, TokenType::CurlyOpen) {
                     p.advance();
                     break 'b new_statement("Block").parse(p)?
                 }
 
-                if p.peek(0) == Token::Key("loop".to_string()) {
+                if p.peek(0).ttype == TokenType::Key("loop".to_string()) {
                     p.advance();
                     break 'b new_statement("LoopStmt").parse(p)?
                 }
 
-                if p.peek(0) == Token::Key("if".to_string()) {
+                if p.peek(0).ttype == TokenType::Key("if".to_string()) {
                     p.advance();
                     break 'b new_statement("IfStmt").parse(p)?
                 }
 
-                if p.peek(0) == Token::Key("while".to_string()) {
+                if p.peek(0).ttype == TokenType::Key("while".to_string()) {
                     p.advance();
                     break 'b new_statement("WhileStmt").parse(p)?
                 }
 
-                if p.peek(0) == Token::Key("break".to_string()) {
+                if p.peek(0).ttype == TokenType::Key("break".to_string()) {
                     p.advance();
-                    break 'b new_statement("BreakStmt")
+
+                    if p.peek(0).ttype == TokenType::CurlyClose {
+                        break 'b new_statement("BreakStmt")
+                    } else {
+                        return Err("Expected Closing Brace after Break")
+                    }
+                    
                 }
 
                 //if this point is reached, statement is ExprStmt
                 let e = new_expr("Base").parse(p)?;
-                if !matches!(p.peek(0), Token::SemiCol) {
+                if !matches!(p.peek(0).ttype, TokenType::SemiCol) {
                     return Err("Expected Semicolon after Expression Statement")
                 }
                 
@@ -150,7 +156,7 @@ impl Statement {
             }
 
             Statement::LoopStmt(_) => {
-                if p.peek(0) != Token::CurlyOpen {
+                if p.peek(0).ttype != TokenType::CurlyOpen {
                     return Err("Expected Block after Loop Statement")
                 }
 
@@ -163,17 +169,17 @@ impl Statement {
             Statement::IfStmt(_) => 'b: {
                 let cond = new_expr("Base").parse(p)?;
 
-                if p.peek(0) != Token::CurlyOpen {
+                if p.peek(0).ttype != TokenType::CurlyOpen {
                     return Err("Expected Block after If Statement")
                 }
                 
                 p.advance();
                 let true_b = new_statement("Block").parse(p)?;
 
-                if p.peek(0) == Token::Key("else".to_string()) {
+                if p.peek(0).ttype == TokenType::Key("else".to_string()) {
                     p.advance();
 
-                    if p.peek(0) != Token::CurlyOpen {return Err("Expected Block After Else Statement")}
+                    if p.peek(0).ttype != TokenType::CurlyOpen {return Err("Expected Block After Else Statement")}
 
                     p.advance();
                     let false_b = new_statement("Block").parse(p)?;
@@ -194,7 +200,7 @@ impl Statement {
             Statement::WhileStmt(_) => {
                 let cond = new_expr("Base").parse(p)?;
                 
-                if p.peek(0) != Token::CurlyOpen {
+                if p.peek(0).ttype != TokenType::CurlyOpen {
                     return Err("Expected Curly Brace after While Statement")
                 }
 
@@ -209,8 +215,8 @@ impl Statement {
             }
 
             Statement::Block(v) => {
-                while p.peek(0) != Token::CurlyClose {
-                    if p.peek(0) == Token::EOF {return Err("Expected Closing Curly Bracket")}
+                while p.peek(0).ttype != TokenType::CurlyClose {
+                    if p.peek(0).ttype == TokenType::EOF {return Err("Expected Closing Curly Bracket")}
                     
                     let s = new_statement("Base").parse(p)?;
                     v.push(s);

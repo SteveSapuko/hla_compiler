@@ -19,7 +19,7 @@ impl Lexer {
     }
 
     
-    pub fn lex(&mut self) -> Result<(Vec<Token>, Vec<usize>), usize> {
+    pub fn lex(&mut self) -> Result<Vec<Token>, usize> {
         let reg_key = Regex::new(r"(?x)
         ^let |
         ^if |
@@ -59,7 +59,6 @@ impl Lexer {
         let reg_lit = Regex::new(r"^\d+(?![[:alpha:]])").unwrap();
 
         let mut token_list: Vec<Token> = vec![];
-        let mut token_pos: Vec<usize> = vec![]; 
 
         while self.data.as_bytes()[self.ptr] != b'\0' {
             //self.ptr = self.skip_whitespace()?;
@@ -68,58 +67,52 @@ impl Lexer {
             //println!("ptr: {}   char: {}", self.ptr, self.data.as_bytes()[self.ptr] as char);
 
             if let Some(m) = reg_key.find(&self.data.as_str()[self.ptr..]).unwrap() {
-                token_list.push(Token::Key(m.as_str().to_string()));
-                token_pos.push(self.ptr);
+                token_list.push(Token{ttype: TokenType::Key(m.as_str().to_string()), pos: self.ptr});
                 self.ptr += m.as_str().len();
                 continue;
             }
 
             if let Some(m) = reg_op.find(&self.data.as_str()[self.ptr..]).unwrap() {
-                token_list.push(Token::Op(m.as_str().to_string()));
-                token_pos.push(self.ptr);
+                token_list.push(Token{ttype: TokenType::Op(m.as_str().to_string()), pos: self.ptr});
                 self.ptr += m.as_str().len();
                 continue;
             }
 
             if let Some(m) = reg_cond.find(&self.data.as_str()[self.ptr..]).unwrap() {
-                token_list.push(Token::Cond(m.as_str().to_string()));
-                token_pos.push(self.ptr);
+                token_list.push(Token{ttype: TokenType::Cond(m.as_str().to_string()), pos: self.ptr});
                 self.ptr += m.as_str().len();
                 continue;
             }
 
             if let Some(m) = reg_id.find(&self.data.as_str()[self.ptr..]).unwrap() {
-                token_list.push(Token::Id(m.as_str().to_string()));
-                token_pos.push(self.ptr);
+                token_list.push(Token{ttype: TokenType::Id(m.as_str().to_string()), pos: self.ptr});
                 self.ptr += m.as_str().len();
                 continue;
             }
 
             if let Some(m) = reg_lit.find(&self.data.as_str()[self.ptr..]).unwrap() {
-                token_list.push(Token::Lit(m.as_str().to_string()));
-                token_pos.push(self.ptr);
+                token_list.push(Token{ttype: TokenType::Lit(m.as_str().to_string()), pos: self.ptr});
                 self.ptr += m.as_str().len();
                 continue;
             }
 
             match self.data.as_bytes()[self.ptr] {
-                b'(' => {token_list.push(Token::ParenOpen); token_pos.push(self.ptr); self.ptr += 1; continue},
-                b')' => {token_list.push(Token::ParenClose); token_pos.push(self.ptr); self.ptr += 1; continue},
-                b'[' => {token_list.push(Token::SquareOpen); token_pos.push(self.ptr); self.ptr += 1; continue},
-                b']' => {token_list.push(Token::SquareClose); token_pos.push(self.ptr); self.ptr += 1; continue},
-                b'{' => {token_list.push(Token::CurlyOpen); token_pos.push(self.ptr); self.ptr += 1; continue},
-                b'}' => {token_list.push(Token::CurlyClose); token_pos.push(self.ptr); self.ptr += 1; continue},
-                b';' => {token_list.push(Token::SemiCol); token_pos.push(self.ptr); self.ptr += 1; continue},
-                b':' => {token_list.push(Token::Col); token_pos.push(self.ptr); self.ptr += 1; continue},
+                b'(' => {token_list.push(Token {ttype: TokenType::ParenOpen, pos: self.ptr}); self.ptr += 1; continue},
+                b')' => {token_list.push(Token {ttype: TokenType::ParenClose, pos: self.ptr}); self.ptr += 1; continue},
+                b'[' => {token_list.push(Token {ttype: TokenType::SquareOpen, pos: self.ptr}); self.ptr += 1; continue},
+                b']' => {token_list.push(Token {ttype: TokenType::SquareClose, pos: self.ptr}); self.ptr += 1; continue},
+                b'{' => {token_list.push(Token {ttype: TokenType::CurlyOpen, pos: self.ptr}); self.ptr += 1; continue},
+                b'}' => {token_list.push(Token {ttype: TokenType::CurlyClose, pos: self.ptr}); self.ptr += 1; continue},
+                b';' => {token_list.push(Token {ttype: TokenType::SemiCol, pos: self.ptr}); self.ptr += 1; continue},
+                b':' => {token_list.push(Token {ttype: TokenType::Col, pos: self.ptr}); self.ptr += 1; continue},
                 _ => {}
             }
 
             return Err(self.ptr);
         }
 
-        token_list.push(Token::EOF);
-        token_pos.push(self.ptr);
-        return Ok((token_list, token_pos));
+        token_list.push(Token {ttype: TokenType::EOF, pos: self.ptr});
+        return Ok(token_list);
     }
 
     fn skip_whitespace(&mut self) {

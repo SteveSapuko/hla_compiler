@@ -17,9 +17,9 @@ fn main() {
 
 
      let mut l = Lexer::new(text.clone()).unwrap();
-     let (tokens, token_pos);
+     let tokens;
      match l.lex() {
-          Ok(d) => (tokens, token_pos) = d,
+          Ok(d) => tokens = d,
           Err(p) => {
                let (line, col) = find_relative_pos(p, text);
                println!("Lexing Error at Line: {} Col: {}", line, col);
@@ -32,8 +32,8 @@ fn main() {
      let ast = parser.parse();
 
      if let Err(e) = ast {
-          let (line, col) = find_relative_pos(token_pos[parser.ptr - 1], text);
-          println!("PARSING ERROR - {} - at Ln: {} Col: {} - Token: {}\n", e, line, col, tokens[parser.ptr - 1]);
+          let (line, col) = find_relative_pos(parser.tokens[parser.ptr - 1].pos, text);
+          println!("PARSING ERROR - {} - at Ln: {} Col: {} - Token: {}\n", e, line, col, parser.tokens[parser.ptr - 1].ttype);
           std::process::exit(-1);
      }
 
