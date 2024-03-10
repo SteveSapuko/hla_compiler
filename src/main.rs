@@ -3,6 +3,7 @@ mod parser;
 mod definitions;
 mod expression;
 mod statement;
+mod syntax;
 
 use crate::{lexer::*, parser::Parser};
 use std::{fs::File, io::Read};
@@ -39,8 +40,6 @@ fn main() {
      for s in ast.clone().unwrap() {
           println!("{}", s);
      }
-
-     //println!("{:#?}", ast.clone());
      
 
 }
