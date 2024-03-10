@@ -1,8 +1,4 @@
-loop {
-    let x: u8 = 0;
-    if x < 5 {
-        x = x + 1;
-    } else {
-        x = 0;
-    }
+while x < 5 {
+    x = x + 1;
+    break
 }

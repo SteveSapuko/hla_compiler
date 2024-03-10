@@ -10,6 +10,8 @@ pub enum Statement {
     Stmt,
     LoopStmt(Box<Statement>), //must contain Statement::Block
     IfStmt(Box<CondStmt>),
+    WhileStmt(Box<CondStmt>),
+    BreakStmt,
     ExprStmt(Expr),
     Block(Vec<Statement>),
 }
@@ -49,6 +51,11 @@ pub fn new_statement(t: &'static str) -> Statement{
             true_branch: new_statement("Block"),
             false_branch: None,
         })),
+        "WhileStmt" => Statement::WhileStmt(Box::new(CondStmt {
+            cond: new_expr("Base"),
+            true_branch: new_statement("Block"),
+            false_branch: None })),
+        "BreakStmt" => {Statement::BreakStmt}
         _ => panic!("Need to implement new_statement")
     }
 }
@@ -122,6 +129,16 @@ impl Statement {
                     break 'b new_statement("IfStmt").parse(p)?
                 }
 
+                if p.peek(0) == Token::Key("while".to_string()) {
+                    p.advance();
+                    break 'b new_statement("WhileStmt").parse(p)?
+                }
+
+                if p.peek(0) == Token::Key("break".to_string()) {
+                    p.advance();
+                    break 'b new_statement("BreakStmt")
+                }
+
                 //if this point is reached, statement is ExprStmt
                 let e = new_expr("Base").parse(p)?;
                 if !matches!(p.peek(0), Token::SemiCol) {
@@ -174,6 +191,23 @@ impl Statement {
                     false_branch: None }))
             }
 
+            Statement::WhileStmt(_) => {
+                let cond = new_expr("Base").parse(p)?;
+                
+                if p.peek(0) != Token::CurlyOpen {
+                    return Err("Expected Curly Brace after While Statement")
+                }
+
+                p.advance();
+
+                let body = new_statement("Block").parse(p)?;
+
+                Statement::WhileStmt(Box::new(CondStmt {
+                    cond: cond,
+                    true_branch: body,
+                    false_branch: None }))
+            }
+
             Statement::Block(v) => {
                 while p.peek(0) != Token::CurlyClose {
                     if p.peek(0) == Token::EOF {return Err("Expected Closing Curly Bracket")}
@@ -212,6 +246,8 @@ impl std::fmt::Display for Statement {
             Statement::VarDeclr(d) => write!(f, "declare {} type: {} value: {}", d.name, d.var_type, d.value.unwrap_or(new_expr("Base"))),
             Statement::LoopStmt(d) => write!(f, "Loop {}", *d),
             Statement::IfStmt(d) => write!(f, "If {} then {}\nelse {}", d.cond, d.true_branch, d.false_branch.unwrap_or(new_statement("Base"))),
+            Statement::WhileStmt(d) => write!(f, "While {} do {}", d.cond, d.true_branch),
+            Statement::BreakStmt => write!(f, "Break"),
             _ => panic!("implement stmt display")
         }
     }

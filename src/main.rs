@@ -39,6 +39,8 @@ fn main() {
      for s in ast.clone().unwrap() {
           println!("{}", s);
      }
+
+     //println!("{:#?}", ast.clone());
      
 
 }
