@@ -12,6 +12,7 @@ pub enum Expr {
     Shift(Box<BinaryExpr>),
     Unary(Box<UnaryExpr>),
     Cast(Box<Cast>),
+    Ref(Ref),
     Primary(Box<PrimaryExpr>),
 }
 
@@ -38,6 +39,12 @@ pub struct UnaryExpr {
 pub struct Cast {
     pub value: Expr,
     pub to_type: Token
+}
+
+#[derive(Clone, Debug)]
+pub struct Ref {
+    pub operator: Token,
+    pub right: Token,
 }
 
 pub fn new_expr(t: &'static str) -> Expr {
@@ -87,6 +94,10 @@ pub fn new_expr(t: &'static str) -> Expr {
             value: new_expr("Base"),
             to_type: Token {ttype: TokenType::Arrow, pos: 0},
         })),
+
+        "Ref" => Expr::Ref(Ref {
+            operator: Token { ttype: TokenType::Arrow, pos: 0 },
+            right: Token { ttype: TokenType::Arrow, pos: 0 } }),
 
         "Primary" => Expr::Primary(Box::new(PrimaryExpr::Literal(Token { ttype: TokenType::Arrow, pos: 0 }))),
         _ => panic!("new_expr invalid syntax -- {}", t)
@@ -242,7 +253,7 @@ impl Expr {
             }
         
             Expr::Cast(_) => 'b: {
-                let v = new_expr("Primary").parse(p)?;
+                let v = new_expr("Ref").parse(p)?;
 
                 if p.peek(0).ttype == TokenType::Op("as".to_string()) {
                     p.advance();
@@ -262,6 +273,23 @@ impl Expr {
                 }
 
                 v
+            }
+
+            Expr::Ref(_) => 'b: {
+                if p.peek(0).ttype == TokenType::Op("*".to_string()) || 
+                p.peek(0).ttype == TokenType::Op("&".to_string()){
+                    p.advance();
+                    if let TokenType::Id(_) = p.peek(0).ttype {
+                        p.advance();
+                        break 'b Expr::Ref(Ref {
+                            operator: p.peek(-2),
+                            right: p.peek(-1)
+                        })
+                    }
+                    return Err("Expected Identifier to Reference")
+                }
+
+                new_expr("Primary").parse(p)?
             }
 
             Expr::Primary(_) => 'b: {
@@ -320,6 +348,7 @@ impl std::fmt::Display for Expr {
             Self::Shift(d) => write!(f, "({} {} {})", d.left, d.operator.ttype, d.right),
             Self::Unary(d) => write!(f, "({} {})", d.operator.ttype, d.right),
             Self::Cast(d) => write!(f, "({} cast to {})", d.value, d.to_type.ttype),
+            Self::Ref(d) => write!(f, "{} reference Op on {}", d.operator.data(), d.right.data()),
             Self::Primary(d) => {
                 match *d.clone() {
                     PrimaryExpr::Grouping(v) => write!(f, "({})", v),

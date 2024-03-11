@@ -56,7 +56,7 @@ impl Lexer {
 
         let reg_id = Regex::new(r"^[[:alpha:]][[:alnum:]]*").unwrap();
 
-        let reg_lit = Regex::new(r"^\d+(?![[:alpha:]])").unwrap();
+        let reg_lit = Regex::new(r"^-?\d+(?![[:alpha:]])").unwrap();
 
         let mut token_list: Vec<Token> = vec![];
 

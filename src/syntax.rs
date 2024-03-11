@@ -1,9 +1,8 @@
+use std::vec;
+
 use super::definitions::*;
 use super::statement::*;
 use super::expression::*;
-
-
-
 
 pub fn check_ast_syntax(ast: Vec<Statement>) -> Result<(), SyntaxErr> {
     let mut ss = ScopeStack {stack: vec![]};
@@ -18,6 +17,8 @@ pub fn check_ast_syntax(ast: Vec<Statement>) -> Result<(), SyntaxErr> {
 //check_syntax() makes sure variables are declared before used, and that types are correct
 impl Statement {
     fn check_syntax(&self, ss: &mut ScopeStack) -> Result<(), SyntaxErr> {
+        let defined_types: Vec<UserStruct> = vec![];
+
         match self.clone() {
             Self::Block(body) => {
                 ss.enter_scope();
@@ -30,18 +31,22 @@ impl Statement {
             }
             
             Self::VarDeclr(declr) => {
+                let declared_type = match VarType::from(&declr.var_type.data(), &defined_types) {
+                    Ok(t) => t,
+                    Err(e) => {return Err(SyntaxErr::UnknownType(declr.var_type.clone(), e))}
+                };
+                
                 if let Some(value) = declr.value {
-                    let value_type = value.check_syntax(ss)?;
-                    ss.declr(declr.name.clone(), declr.var_type.clone());
+                    let value_type = value.check_syntax(ss)?;  
+                    println!("declared type: {:?}   value: {}    value type: {:?}", declared_type, value, value_type);
+                    ss.declr(declr.name.clone(), declared_type.clone());
 
-                    if value_type != declr.var_type {
-                        return Err(SyntaxErr::WrongType(declr.var_type, Token {
-                            ttype: TokenType::Id(value_type),
-                            pos: declr.name.pos + 3 })) //+3 so that the token reported is "="
+                    if value_type != declared_type {
+                        return Err(SyntaxErr::WrongType(declared_type, value_type))
                     }
                 }
 
-                ss.declr(declr.name, declr.var_type);
+                ss.declr(declr.name, declared_type);
             }
 
             Self::LoopStmt(body) => {
@@ -76,16 +81,14 @@ impl Statement {
 
 impl Expr {
     //returns expr type if Ok
-    fn check_syntax(&self, ss: &mut ScopeStack) -> Result<String, SyntaxErr> {
+    fn check_syntax(&self, ss: &mut ScopeStack) -> Result<VarType, SyntaxErr> {
         match self.clone() {
             Self::Assign(e) => {
                 let left_type = e.left.check_syntax(ss)?;
                 let right_type = e.right.check_syntax(ss)?;
 
                 if left_type != right_type {
-                    return Err(SyntaxErr::WrongType(right_type, Token {
-                        ttype: TokenType::Id(left_type),
-                        pos: e.operator.pos }))
+                    return Err(SyntaxErr::WrongType(right_type, left_type))
                 }
 
                 return Ok(right_type)
@@ -96,9 +99,7 @@ impl Expr {
                 let right_type = e.right.check_syntax(ss)?;
 
                 if left_type != right_type {
-                    return Err(SyntaxErr::WrongType(left_type, Token {
-                        ttype: TokenType::Id(right_type),
-                        pos: e.operator.pos }))
+                    return Err(SyntaxErr::WrongType(right_type, left_type))
                 }
 
                 return Ok(left_type)
@@ -109,9 +110,7 @@ impl Expr {
                 let right_type = e.right.check_syntax(ss)?;
 
                 if left_type != right_type {
-                    return Err(SyntaxErr::WrongType(left_type, Token {
-                        ttype: TokenType::Id(right_type),
-                        pos: e.operator.pos }))
+                    return Err(SyntaxErr::WrongType(right_type, left_type))
                 }
 
                 return Ok(left_type)
@@ -122,9 +121,7 @@ impl Expr {
                 let right_type = e.right.check_syntax(ss)?;
 
                 if left_type != right_type {
-                    return Err(SyntaxErr::WrongType(left_type, Token {
-                        ttype: TokenType::Id(right_type),
-                        pos: e.operator.pos }))
+                    return Err(SyntaxErr::WrongType(right_type, left_type))
                 }
 
                 return Ok(left_type)
@@ -135,9 +132,7 @@ impl Expr {
                 let right_type = e.right.check_syntax(ss)?;
 
                 if left_type != right_type {
-                    return Err(SyntaxErr::WrongType(left_type, Token {
-                        ttype: TokenType::Id(right_type),
-                        pos: e.operator.pos }))
+                    return Err(SyntaxErr::WrongType(right_type, left_type))
                 }
 
                 return Ok(left_type)
@@ -148,7 +143,42 @@ impl Expr {
             }
 
             Self::Cast(cast) => {
-                Ok(cast.to_type.data())
+                // no casting to a struct
+                let defined_types: Vec<UserStruct> = vec![];
+
+                match VarType::from(&cast.to_type.data(), &defined_types) {
+                    Ok(t) => Ok(t),
+                    Err(e) => return Err(SyntaxErr::UnknownType(cast.to_type, e))
+                }
+
+            }
+
+            Self::Ref(r) => {
+                if r.operator.data().as_str() == "*" {
+                    //code is incorrect, need to add pointer as a type that points to a type
+                    let right_type = match ss.get_var_t(r.right.data()) {
+                        Some(t) => t,
+                        None => return Err(SyntaxErr::Undeclared(r.right))
+                    };
+
+                    if let VarType::Pointer(p) = right_type {
+                        return Ok(*p.clone())
+                    }
+
+                    return Err(SyntaxErr::NotDerefAble(r.right))
+                }
+
+                if r.operator.data().as_str() == "&" {
+                    println!("got here");
+                    let right_type = match ss.get_var_t(r.right.data()) {
+                        Some(t) => t,
+                        None => return Err(SyntaxErr::Undeclared(r.right))
+                    };
+
+                    return Ok(VarType::Pointer(Box::new(right_type)))
+                }
+
+                panic!("ref is messed up")
             }
 
             Self::Primary(e) => {
@@ -159,11 +189,56 @@ impl Expr {
 
                     PrimaryExpr::Literal(l) => {
                         //needs to be expanded
-                        
+                        let mut signed = false;
                         if l.data().as_bytes()[0] == b'-' {
-                            return Ok("i8".to_string())
+                            signed = true;
                         }
-                        return Ok("u8".to_string())
+
+                        if !signed {
+                            let number = match l.data().parse::<u64>() {
+                                Ok(t) => t,
+                                Err(_) => return Err(SyntaxErr::LiteralErr(l.clone()))
+                            };
+
+                            if number <= u64::MAX {
+                                if number <= u32::MAX.into() {
+                                    if number <= u16::MAX.into() {
+                                        if number <= u8::MAX.into() {
+                                            return Ok(VarType::U8)
+                                        }
+                                        
+                                        return Ok(VarType::U16)
+                                    }
+
+                                    return Ok(VarType::U32)
+                                }
+
+                                return Ok(VarType::U64)
+                            }
+                        }
+
+                        let number = match l.data().parse::<i64>() {
+                            Ok(t) => t,
+                            Err(_) => return Err(SyntaxErr::LiteralErr(l.clone()))
+                        };
+
+                        if number <= i64::MAX && number >= i64::MIN {
+                            if number <= i32::MAX.into() && number >= i32::MIN.into() {
+                                if number <= i16::MAX.into() && number >= i16::MIN.into() {
+                                    if number <= i8::MAX.into() && number >= i8::MIN.into() {
+                                        return Ok(VarType::I8)
+                                    }
+                                    
+                                    return Ok(VarType::I16)
+                                }
+
+                                return Ok(VarType::I32)
+                            }
+
+                            return Ok(VarType::I64)
+                        }
+
+                        panic!("Number literal error")
                     }
 
                     PrimaryExpr::Id(id) => {
@@ -178,8 +253,6 @@ impl Expr {
                     }
                 }
             }
-
-
 
             _ => panic!("check_syntax for this expr not implemented")
         }
@@ -203,30 +276,14 @@ impl ScopeStack {
         self.stack.pop();
     }
 
-    fn declr(&mut self, tok: Token, t: String) {
+    fn declr(&mut self, tok: Token, t: VarType) {
         self.stack.push(ScopeStackOp::Variable(VarData {
             tok: tok,
             var_type: t
         }));
     }
 
-    fn check_var_t(&self, checking: Token, target_type: String) -> Result<(), SyntaxErr> {
-        for element in self.stack.iter().rev() {
-            if let ScopeStackOp::Variable(var) = element {
-                if var.tok.data() == checking.data() { //check if names match
-                    if var.var_type != target_type {
-                        return Err(SyntaxErr::WrongType(target_type, var.tok.clone()))
-                    }
-                    
-                    return Ok(())
-                }
-            } 
-        }
-
-        Err(SyntaxErr::Undeclared(checking))
-    }
-
-    fn get_var_t(&self, target_name: String) -> Option<String> {
+    fn get_var_t(&self, target_name: String) -> Option<VarType> {
         for element in self.stack.iter().rev() {
             if let ScopeStackOp::Variable(var) = element {
                 if var.tok.data() == target_name {
@@ -239,14 +296,17 @@ impl ScopeStack {
 }
 
 /*
-Undeclared(VARIABLE USED),
+Undeclared(VARIABLE_USED),
 WrongType(Should, Is)
 */
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum SyntaxErr {
     Undeclared(Token),
-    WrongType(String, Token)
+    WrongType(VarType, VarType),
+    UnknownType(Token, &'static str),
+    LiteralErr(Token),
+    NotDerefAble(Token)
 }
 
 enum ScopeStackOp {
@@ -254,7 +314,8 @@ enum ScopeStackOp {
     Variable(VarData)
 }
 
+#[derive(Debug, Clone)]
 struct VarData {
     tok: Token,
-    var_type: String,
+    var_type: VarType,
 }

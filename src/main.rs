@@ -44,7 +44,7 @@ fn main() {
      }
 
      if let Err(e) = check_ast_syntax(ast.clone()) {
-          println!("{:#?}", e);
+          println!("\n{:#?}", e);
      }
 
 }
