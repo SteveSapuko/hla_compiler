@@ -38,7 +38,7 @@ impl Statement {
                 
                 if let Some(value) = declr.value {
                     let value_type = value.check_syntax(ss)?;  
-                    println!("declared type: {:?}   value: {}    value type: {:?}", declared_type, value, value_type);
+                    //println!("declared type: {:?}   value: {:#?}    value type: {:?}", declared_type, value, value_type);
                     ss.declr(declr.name.clone(), declared_type.clone());
 
                     if value_type != declared_type {
@@ -169,7 +169,6 @@ impl Expr {
                 }
 
                 if r.operator.data().as_str() == "&" {
-                    println!("got here");
                     let right_type = match ss.get_var_t(r.right.data()) {
                         Some(t) => t,
                         None => return Err(SyntaxErr::Undeclared(r.right))

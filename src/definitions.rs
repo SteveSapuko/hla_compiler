@@ -104,6 +104,7 @@ impl VarType {
     }
 
     pub fn from(t: &str, defined_types: &Vec<UserStruct>) -> Result<Self, &'static str> {
+        //println!("doing {}", t);
         match t.to_lowercase().as_str() {
             "u8" => Ok(Self::U8),
             "i8" => Ok(Self::I8),
@@ -118,6 +119,12 @@ impl VarType {
             "i64" => Ok(Self::I64),
 
             _ => {
+                if t.len() >= 4 {
+                    if &t[0..4] == "ptr@" {
+                        return Ok(VarType::Pointer(Box::new(VarType::from(&t[4..], defined_types)?)))
+                    }
+                }
+                
                 for user_type in defined_types {
                     if t == user_type.name {
                         return Ok(VarType::UserStruct(user_type.clone()))

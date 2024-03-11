@@ -87,11 +87,22 @@ impl Statement {
                 }
                 p.advance();
 
-                if !matches!(p.peek(0).ttype, TokenType::Id(_)) {
-                    return Err("Expected Identifier for Variable Type")
+                let vtype;
+
+                if matches!(p.peek(0).ttype, TokenType::Id(_)) {
+                    vtype = p.peek(0);
+                } else if p.peek(0).ttype == TokenType::Key("ptr@".to_string())
+                          && matches!(p.peek(1).ttype, TokenType::Id(_)){
+                    
+                    vtype = Token {
+                        ttype: TokenType::Id(p.peek(0).data() + &p.peek(1).data()),
+                        pos: p.peek(0).pos
+                    };
+                    p.advance();
+                } else {
+                    return Err("Expected Identifier or ptr@Identifier as type for declaration")
                 }
 
-                let vtype = p.peek(0);
                 p.advance();
 
                 let mut value = None;

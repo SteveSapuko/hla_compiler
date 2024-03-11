@@ -30,6 +30,7 @@ impl Lexer {
         ^for |
         ^return |
         ^continue |
+        ^ptr@ |
         ^break").unwrap();
 
         let reg_op = Regex::new(r"(?x)

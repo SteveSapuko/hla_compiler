@@ -1,4 +1,8 @@
 loop {
-    let x: u8 = 255;
-    let y: u16 = &x as u16;
+    let x: ptr@u8;
+    let y: u8 = 5;
+
+    x = &y;
+
+    let z: u8 = *x;
 }
