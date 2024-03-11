@@ -1,5 +1,9 @@
-/*use super::statement::*;
+use super::definitions::*;
+use super::statement::*;
 use super::expression::*;
+
+
+
 
 pub fn syntaxCheck(ast: Vec<Statement>) -> Result<(), ()> {
     let mut ss = ScopeStack {stack: vec![]};
@@ -11,10 +15,10 @@ pub fn syntaxCheck(ast: Vec<Statement>) -> Result<(), ()> {
     Ok(())
 }
 
+//check_syntax() makes sure variables are declared before used, and that types are correct
 
-impl Statement {
-    fn checkSyntax(&self, ss: ScopeStack) -> Result<(), (CheckResult, )>
-}
+
+
 
 struct ScopeStack {
     stack: Vec<ScopeStackOp>,
@@ -32,34 +36,48 @@ impl ScopeStack {
         self.stack.pop();
     }
 
-    fn declr(&mut self, name: String, t: String) {
+    fn declr(&mut self, tok: Token, t: TokenType) {
         self.stack.push(ScopeStackOp::Variable(VarData {
-            name: name,
-            v_type: t
+            tok: tok,
+            v_type: t.data()
         }));
     }
 
-    fn check(&mut self, n: String, t: String) -> CheckResult {
+    fn check_var_t(&self, n: String, t: String) -> Result<(), SyntaxErr> {
         for element in self.stack.iter().rev() {
             if let ScopeStackOp::Variable(v) = element {
-                if v.name == n {
+                if v.tok.ttype.data() == n {
                     if v.v_type != t {
-                        return CheckResult::WrongType
-                    } else {
-                        return CheckResult::Ok
+                        return Err(SyntaxErr::WrongType(t, v.tok.clone()))
                     }
+                    
+                    return Ok(())
                 }
             } 
         }
 
-        CheckResult::Undeclared
+        Err(SyntaxErr::Undeclared(n))
+    }
+
+    fn get_var_t(&self, name: String) -> Option<String> {
+        for element in self.stack.iter().rev() {
+            if let ScopeStackOp::Variable(v) = element {
+                if v.tok.ttype.data() == name {
+                    return Some(v.v_type.clone())
+                }
+            } 
+        }
+        None
     }
 }
 
-enum CheckResult {
-    Ok,
-    Undeclared,
-    WrongType
+/*
+Undeclared(VARIABLE USED),
+WrongType(Should, Is)
+*/
+enum SyntaxErr {
+    Undeclared(String),
+    WrongType(String, Token)
 }
 
 enum ScopeStackOp {
@@ -68,6 +86,6 @@ enum ScopeStackOp {
 }
 
 struct VarData {
-    name: String,
+    tok: Token,
     v_type: String,
-}*/
+}

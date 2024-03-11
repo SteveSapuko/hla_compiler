@@ -18,37 +18,37 @@ pub enum Expr {
 #[derive(Clone, Debug)]
 pub enum PrimaryExpr {
     Grouping(Expr),
-    Literal(String),
-    Id(String),
+    Literal(Token),
+    Id(Token),
 }
 
 #[derive(Clone, Debug)]
 pub struct BinaryExpr {
-    left: Expr,
-    operator: Token,
-    right: Expr,
+    pub left: Expr,
+    pub operator: Token,
+    pub right: Expr,
 }
 
 #[derive(Clone, Debug)]
 pub struct UnaryExpr {
-    operator: Token,
-    right: Expr
+    pub operator: Token,
+    pub right: Expr
 }
 #[derive(Clone, Debug)]
 pub struct Cast {
-    value: Expr,
-    to_type: Token
+    pub value: Expr,
+    pub to_type: Token
 }
 
 pub fn new_expr(t: &'static str) -> Expr {
     match t {
         "Base" => Expr::Base,
         "Assign" => Expr::Assign(Box::new(BinaryExpr{
-            left: new_expr("Expr"),
+            left: new_expr("Equality"),
             operator: Token {ttype: TokenType::Op("=".to_string()), pos: 0},
-            right: new_expr("Expr"),}
+            right: new_expr("Equality"),}
         )),
-        "Expr" => Expr::Equality(Box::new(
+        "Equality" => Expr::Equality(Box::new(
             BinaryExpr {
                 left: new_expr("Comp"),
                 operator: Token {ttype: TokenType::Arrow, pos: 0},
@@ -88,7 +88,7 @@ pub fn new_expr(t: &'static str) -> Expr {
             to_type: Token {ttype: TokenType::Arrow, pos: 0},
         })),
 
-        "Primary" => Expr::Primary(Box::new(PrimaryExpr::Literal(String::new()))),
+        "Primary" => Expr::Primary(Box::new(PrimaryExpr::Literal(Token { ttype: TokenType::Arrow, pos: 0 }))),
         _ => panic!("new_expr invalid syntax -- {}", t)
     }
 }
@@ -102,7 +102,7 @@ impl Expr {
             }
 
             Expr::Assign(_) => {
-                let mut e = new_expr("Expr").parse(p)?;
+                let mut e = new_expr("Equality").parse(p)?;
 
                 if TokenType::Op("=".to_string()) == p.peek(0).ttype {
                     p.advance();
@@ -110,7 +110,7 @@ impl Expr {
 
                     e = Expr::Assign(Box::new(BinaryExpr {
                         left: e,
-                        operator: Token {ttype: TokenType::Op("=".to_string()), pos: 0},
+                        operator: Token {ttype: TokenType::Op("=".to_string()), pos: p.peek(-1).pos},
                         right: right }))
                 }
                 
@@ -125,7 +125,6 @@ impl Expr {
                 while if let TokenType::Cond(d) = p.peek(0).ttype {
                     d.as_str() == "==" || d.as_str() == "!="
                 } else {false} {
-                    println!("hmm");
                     let new_operator = p.peek(0);
                     p.advance();
 
@@ -288,15 +287,15 @@ impl Expr {
                 //not a grouping if this point is reached
 
                 let e = match p.peek(0).ttype {
-                    TokenType::Lit(d) => {
+                    TokenType::Lit(_) => {
                         Expr::Primary(
-                            Box::new(PrimaryExpr::Literal(d))
+                            Box::new(PrimaryExpr::Literal(p.peek(0)))
                         )
                     }
 
-                    TokenType::Id(d) => {
+                    TokenType::Id(_) => {
                         Expr::Primary(
-                            Box::new(PrimaryExpr::Id(d))
+                            Box::new(PrimaryExpr::Id(p.peek(0)))
                         )
                     }
                     _ => return Err("Expected Expression")
@@ -324,8 +323,8 @@ impl std::fmt::Display for Expr {
             Self::Primary(d) => {
                 match *d.clone() {
                     PrimaryExpr::Grouping(v) => write!(f, "({})", v),
-                    PrimaryExpr::Literal(v) => write!(f, "{}", v),
-                    PrimaryExpr::Id(v) => write!(f, "{}", v), 
+                    PrimaryExpr::Literal(v) => write!(f, "{}", v.ttype),
+                    PrimaryExpr::Id(v) => write!(f, "{}", v.ttype), 
                 }
             }
         }

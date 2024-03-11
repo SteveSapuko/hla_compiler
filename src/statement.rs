@@ -79,7 +79,7 @@ impl Statement {
                     return Err("Expected Identifier for Variable Name")
                 }
 
-                let name = p.peek(0).ttype.data().expect("id needs string");
+                let name = p.peek(0).ttype.data();
                 p.advance();
 
                 if !matches!(p.peek(0).ttype, TokenType::Col) {
@@ -91,7 +91,7 @@ impl Statement {
                     return Err("Expected Identifier for Variable Type")
                 }
 
-                let vtype = p.peek(0).ttype.data().unwrap();
+                let vtype = p.peek(0).ttype.data();
                 p.advance();
 
                 let mut value = None;

@@ -1,3 +1,5 @@
+use crate::expression::*;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token {
     pub ttype: TokenType,
@@ -24,14 +26,14 @@ pub enum TokenType {
 }
 
 impl TokenType {
-    pub fn data(&self) -> Option<String>{
+    pub fn data(&self) -> String{
         match self {
-            TokenType::Key(d) => Some(d.clone()),
-            TokenType::Op(d) => Some(d.clone()),
-            TokenType::Cond(d) => Some(d.clone()),
-            TokenType::Id(d) => Some(d.clone()),
-            TokenType::Lit(d) => Some(d.clone()),
-            _ => None
+            TokenType::Key(d) => d.clone(),
+            TokenType::Op(d) => d.clone(),
+            TokenType::Cond(d) => d.clone(),
+            TokenType::Id(d) => d.clone(),
+            TokenType::Lit(d) => d.clone(),
+            _ => panic!("Token didn't have data")
         }
     }
 }
@@ -54,6 +56,20 @@ impl std::fmt::Display for TokenType {
             Self::Col => write!(f, ":"),
             Self::Arrow => write!(f, "->"),
             Self::EOF => write!(f, "EOF"),
+        }
+    }
+}
+
+impl Expr {
+    pub fn get_id_value(&self) -> String {
+        match self.clone() {
+            Self::Primary(p) => {
+                match *p {
+                    PrimaryExpr::Id(s) => s.ttype.data(),
+                    _ => panic!("Use this only on ID Expressions")
+                }
+            }
+            _ => panic!("use this only on ID Expressions")
         }
     }
 }
