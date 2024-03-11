@@ -6,6 +6,12 @@ pub struct Token {
     pub pos: usize,
 }
 
+impl Token {
+    pub fn data(&self) -> String {
+        self.ttype.data()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenType {
     Key(String),
@@ -60,7 +66,7 @@ impl std::fmt::Display for TokenType {
     }
 }
 
-impl Expr {
+/*impl Expr {
     pub fn get_id_value(&self) -> String {
         match self.clone() {
             Self::Primary(p) => {
@@ -72,4 +78,4 @@ impl Expr {
             _ => panic!("use this only on ID Expressions")
         }
     }
-}
+}*/

@@ -18,7 +18,7 @@ pub enum Statement {
 
 #[derive(Clone, Debug)]
 pub struct VarDeclr {
-    pub name: String,
+    pub name: Token,
     pub var_type: String,
     pub value: Option<Expr>
 }
@@ -36,7 +36,7 @@ pub fn new_statement(t: &'static str) -> Statement{
         "Declr" => Statement::Declr,
         "VarDeclr" => {
             Statement::VarDeclr(VarDeclr {
-                name: String::new(),
+                name: Token { ttype: TokenType::Arrow, pos: 0 },
                 var_type: String::new(),
                 value: None })
         },
@@ -79,7 +79,7 @@ impl Statement {
                     return Err("Expected Identifier for Variable Name")
                 }
 
-                let name = p.peek(0).ttype.data();
+                let name = p.peek(0);
                 p.advance();
 
                 if !matches!(p.peek(0).ttype, TokenType::Col) {
@@ -91,7 +91,7 @@ impl Statement {
                     return Err("Expected Identifier for Variable Type")
                 }
 
-                let vtype = p.peek(0).ttype.data();
+                let vtype = p.peek(0).data();
                 p.advance();
 
                 let mut value = None;
@@ -249,7 +249,7 @@ impl std::fmt::Display for Statement {
                 //write!(f, "\n")?;
                 Ok(())
             },
-            Statement::VarDeclr(d) => write!(f, "declare {} type: {} value: {}", d.name, d.var_type, d.value.unwrap_or(new_expr("Base"))),
+            Statement::VarDeclr(d) => write!(f, "declare {} type: {} value: {}", d.name.data(), d.var_type, d.value.unwrap_or(new_expr("Base"))),
             Statement::LoopStmt(d) => write!(f, "Loop {}", *d),
             Statement::IfStmt(d) => write!(f, "If {} then {}\nelse {}", d.cond, d.true_branch, d.false_branch.unwrap_or(new_statement("Base"))),
             Statement::WhileStmt(d) => write!(f, "While {} do {}", d.cond, d.true_branch),

@@ -5,7 +5,7 @@ mod expression;
 mod statement;
 mod syntax;
 
-use crate::{lexer::*, parser::Parser};
+use crate::{lexer::*, parser::Parser, syntax::check_ast_syntax};
 use std::{fs::File, io::Read};
 
 fn main() {     
@@ -31,16 +31,21 @@ fn main() {
      println!("{:?}\n", parser);
      let ast = parser.parse();
 
-     if let Err(e) = ast {
+     if let Err(e) = ast.clone() {
           let (line, col) = find_relative_pos(parser.tokens[parser.ptr - 1].pos, text);
           println!("PARSING ERROR - {} - at Ln: {} Col: {} - Token: {}\n", e, line, col, parser.tokens[parser.ptr - 1].ttype);
           std::process::exit(-1);
      }
 
-     for s in ast.clone().unwrap() {
+     let ast = ast.unwrap();
+
+     for s in ast.clone() {
           println!("{}", s);
      }
-     
+
+     if let Err(e) = check_ast_syntax(ast.clone()) {
+          println!("{:#?}", e);
+     }
 
 }
 
