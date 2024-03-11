@@ -67,6 +67,15 @@ impl Lexer {
 
             //println!("ptr: {}   char: {}", self.ptr, self.data.as_bytes()[self.ptr] as char);
 
+            if self.ptr < self.data.len() - 2 && &self.data.as_str()[self.ptr..self.ptr+2] == "->" {
+                token_list.push(Token {
+                    ttype: TokenType::Arrow,
+                    pos: self.ptr
+                });
+                self.ptr += 2;
+                continue;
+            }
+
             if let Some(m) = reg_key.find(&self.data.as_str()[self.ptr..]).unwrap() {
                 token_list.push(Token{ttype: TokenType::Key(m.as_str().to_string()), pos: self.ptr});
                 self.ptr += m.as_str().len();
@@ -97,6 +106,7 @@ impl Lexer {
                 continue;
             }
 
+
             match self.data.as_bytes()[self.ptr] {
                 b'(' => {token_list.push(Token {ttype: TokenType::ParenOpen, pos: self.ptr}); self.ptr += 1; continue},
                 b')' => {token_list.push(Token {ttype: TokenType::ParenClose, pos: self.ptr}); self.ptr += 1; continue},
@@ -106,6 +116,7 @@ impl Lexer {
                 b'}' => {token_list.push(Token {ttype: TokenType::CurlyClose, pos: self.ptr}); self.ptr += 1; continue},
                 b';' => {token_list.push(Token {ttype: TokenType::SemiCol, pos: self.ptr}); self.ptr += 1; continue},
                 b':' => {token_list.push(Token {ttype: TokenType::Col, pos: self.ptr}); self.ptr += 1; continue},
+                b',' => {token_list.push(Token {ttype: TokenType::Comma, pos: self.ptr}); self.ptr += 1; continue},
                 _ => {}
             }
 

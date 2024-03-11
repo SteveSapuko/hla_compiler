@@ -4,6 +4,7 @@ mod definitions;
 mod expression;
 mod statement;
 mod syntax;
+mod cgen;
 
 use crate::{lexer::*, parser::Parser, syntax::check_ast_syntax};
 use std::{fs::File, io::Read};

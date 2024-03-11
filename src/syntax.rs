@@ -1,3 +1,4 @@
+use std::f64::consts::E;
 use std::vec;
 
 use super::definitions::*;
@@ -18,6 +19,7 @@ pub fn check_ast_syntax(ast: Vec<Statement>) -> Result<(), SyntaxErr> {
 impl Statement {
     fn check_syntax(&self, ss: &mut ScopeStack) -> Result<(), SyntaxErr> {
         let defined_types: Vec<UserStruct> = vec![];
+        ss.var_declr(Token {ttype: TokenType::Id("void".to_string()), pos: 0}, VarType::Void);
 
         match self.clone() {
             Self::Block(body) => {
@@ -30,6 +32,41 @@ impl Statement {
                 ss.leave_scope();
             }
             
+            Self::FnDeclr(declr) => {
+                let mut param_names: Vec<Token> = vec![];
+                ss.fn_declr(*declr.clone());
+                ss.enter_func_def();
+                
+                for param in declr.params.get_param_vec() {
+                    let declared_type = match VarType::from(&param.1.data(), &defined_types) {
+                        Ok(t) => t,
+                        Err(e) => {return Err(SyntaxErr::UnknownType(param.1.clone(), e))}
+                    };
+
+                    param_names.push(param.0.clone());
+                    ss.var_declr(param.0, declared_type);
+                }
+
+                //this needs to be redone
+                //checks that names are uniqe
+                for name in param_names.iter() {
+                    let mut count = 0;
+                    for t in param_names.iter() {
+                        if t.data() == name.data() {
+                            count += 1;
+                        }
+                    }
+
+                    if count > 1 {
+                        return Err(SyntaxErr::DupParamNames(name.clone()))
+                    }
+                }
+
+                
+                declr.body.check_syntax(ss)?;
+                ss.leave_func_def();
+            }
+
             Self::VarDeclr(declr) => {
                 let declared_type = match VarType::from(&declr.var_type.data(), &defined_types) {
                     Ok(t) => t,
@@ -39,14 +76,14 @@ impl Statement {
                 if let Some(value) = declr.value {
                     let value_type = value.check_syntax(ss)?;  
                     //println!("declared type: {:?}   value: {:#?}    value type: {:?}", declared_type, value, value_type);
-                    ss.declr(declr.name.clone(), declared_type.clone());
+                    ss.var_declr(declr.name.clone(), declared_type.clone());
 
                     if value_type != declared_type {
                         return Err(SyntaxErr::WrongType(declared_type, value_type))
                     }
                 }
 
-                ss.declr(declr.name, declared_type);
+                ss.var_declr(declr.name, declared_type);
             }
 
             Self::LoopStmt(body) => {
@@ -66,7 +103,28 @@ impl Statement {
                 stmt.true_branch.check_syntax(ss)?;
             }
             
-            Self::BreakStmt => {}
+            Self::BreakStmt(_) => {}
+
+            Self::ReturnStmt(t, d) => {
+                if let Some(e) = d {
+                    let actual_return_type = e.check_syntax(ss)?;
+                    let f = ss.get_nearest_function();
+
+                    match f {
+                        Some(declr) => {
+                            let ret_type = VarType::from(&declr.ret_type.data(), &defined_types).expect("should have been handled");
+                            
+                            if ret_type == actual_return_type {
+                                return Ok(())
+                            } else {
+                                return Err(SyntaxErr::WrongType(ret_type, actual_return_type))
+                            }
+
+                        }
+                        None => return Err(SyntaxErr::ReturnOutsideFunc(t))
+                    }
+                }
+            }
 
             Self::ExprStmt(e) => {
                 e.check_syntax(ss)?;
@@ -151,6 +209,35 @@ impl Expr {
                     Err(e) => return Err(SyntaxErr::UnknownType(cast.to_type, e))
                 }
 
+            }
+
+            Self::FnCall(call) => {
+                let template = match ss.get_fn(call.name.data()) {
+                    Some(t) => t,
+                    None => return Err(SyntaxErr::Undeclared(call.name))
+                };
+
+                //check arg number
+                if call.args.len() != template.params.get_param_vec().len() {
+                    return Err(SyntaxErr::WrongArgN(call.name.clone()))
+                }
+
+                //check args
+                for n in 0..call.args.len() {
+                    let calling_type = call.args[n].check_syntax(ss)?;
+
+                    let expected_type = template.params.get_param_vec()[n].1.clone();
+                    let expected_type = match VarType::from(&expected_type.data(), &vec![]) {
+                        Ok(t) => t,
+                        Err(e) => return Err(SyntaxErr::UnknownType(expected_type, e))
+                    };
+
+                    if calling_type != expected_type {
+                        return Err(SyntaxErr::WrongType(expected_type, calling_type))
+                    }
+                }
+
+                Ok(VarType::from(&template.ret_type.data(), &vec![]).expect("template should have been checked first"))
             }
 
             Self::Ref(r) => {
@@ -259,6 +346,7 @@ impl Expr {
 
 }
 
+#[derive(Debug)]
 struct ScopeStack {
     stack: Vec<ScopeStackOp>,
 }
@@ -275,11 +363,26 @@ impl ScopeStack {
         self.stack.pop();
     }
 
-    fn declr(&mut self, tok: Token, t: VarType) {
+    fn var_declr(&mut self, tok: Token, t: VarType) {
         self.stack.push(ScopeStackOp::Variable(VarData {
             tok: tok,
             var_type: t
         }));
+    }
+
+    fn fn_declr(&mut self, f: FnDeclr) {
+        self.stack.push(ScopeStackOp::Func(f.clone()))
+    }
+
+    fn enter_func_def(&mut self) {
+        self.stack.push(ScopeStackOp::EnterFuncDef);
+    }
+
+    fn leave_func_def(&mut self) {
+        while !matches!(self.stack[self.stack.len() - 1], ScopeStackOp::EnterFuncDef) {
+            self.stack.pop();
+        }
+        self.stack.pop();
     }
 
     fn get_var_t(&self, target_name: String) -> Option<VarType> {
@@ -292,6 +395,35 @@ impl ScopeStack {
         }
         None
     }
+
+    fn get_fn(&self, target_name: String) -> Option<FnDeclr> {
+        for element in self.stack.iter().rev() {
+            if let ScopeStackOp::Func(func) = element {
+                if func.name.data() == target_name {
+                    return Some(func.clone())
+                }
+            } 
+        }
+        None
+    }
+
+    fn get_nearest_function(&self) -> Option<FnDeclr> {
+        let mut next_is_template = false;
+        for element in self.stack.iter().rev() {
+            if next_is_template {
+                if let ScopeStackOp::Func(f) = element {
+                    return Some(f.clone())
+                }
+                panic!("this was supposed to work")
+            }
+            
+            if let ScopeStackOp::EnterFuncDef = element {
+                next_is_template = true;
+            }    
+        }
+        None
+    }
+    
 }
 
 /*
@@ -305,13 +437,21 @@ pub enum SyntaxErr {
     WrongType(VarType, VarType),
     UnknownType(Token, &'static str),
     LiteralErr(Token),
-    NotDerefAble(Token)
+    NotDerefAble(Token),
+    WrongArgN(Token),
+    DupParamNames(Token),
+    ReturnOutsideFunc(Token),
 }
 
+#[derive(Debug)]
 enum ScopeStackOp {
     EnterScope,
-    Variable(VarData)
+    EnterFuncDef,
+    Variable(VarData),
+    Func(FnDeclr),
 }
+
+
 
 #[derive(Debug, Clone)]
 struct VarData {

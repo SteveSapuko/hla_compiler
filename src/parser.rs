@@ -30,10 +30,29 @@ impl Parser {
     pub fn parse(&mut self) -> Result<Vec<Statement>, &'static str> {
         let mut program: Vec<Statement> = vec![];
         
+        self.make_ptr_types();
+
         while self.peek(0).ttype != TokenType::EOF {
             program.push( new_statement("Base").parse(self)?);
         }
 
         Ok(program)
+    }
+
+    fn make_ptr_types(&mut self) {
+        while self.peek(0).ttype != TokenType::EOF {
+            if self.peek(0).ttype == TokenType::Key("ptr@".to_string()) {
+                if matches!(self.peek(1).ttype, TokenType::Id(_)) {
+                    self.tokens[self.ptr] = Token {
+                        ttype: TokenType::Id("ptr@".to_string() + &self.peek(1).data()),
+                        pos: self.peek(0).pos
+                    };
+
+                    self.tokens.remove(self.ptr + 1);
+                }
+            }
+            self.advance();
+        }
+        self.ptr = 0;
     }
 }

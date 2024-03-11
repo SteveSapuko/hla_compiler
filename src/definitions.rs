@@ -1,3 +1,5 @@
+use super::statement::*;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token {
     pub ttype: TokenType,
@@ -25,6 +27,7 @@ pub enum TokenType {
     CurlyClose,
     SemiCol,
     Col,
+    Comma,
     Arrow,
     EOF,
 }
@@ -60,6 +63,7 @@ impl std::fmt::Display for TokenType {
             Self::Col => write!(f, ":"),
             Self::Arrow => write!(f, "->"),
             Self::EOF => write!(f, "EOF"),
+            Self::Comma => write!(f, ",")
         }
     }
 }
@@ -76,6 +80,7 @@ pub enum VarType {
     U64,
     I64,
     UserStruct(UserStruct),
+    Void,
     Array(u16, Box<VarType>)
 }
 
@@ -98,6 +103,7 @@ impl VarType {
                 }
                 sum
             }
+            Self::Void => 0,
             Self::Array(s, _) => *s
 
         }
@@ -124,6 +130,10 @@ impl VarType {
                         return Ok(VarType::Pointer(Box::new(VarType::from(&t[4..], defined_types)?)))
                     }
                 }
+
+                if t == "void" {
+                    return Ok(VarType::Void)
+                }
                 
                 for user_type in defined_types {
                     if t == user_type.name {
@@ -141,4 +151,14 @@ impl VarType {
 pub struct UserStruct {
     pub name: String,
     pub fields: Vec<(String, VarType)>
+}
+
+impl Statement {
+    pub fn get_param_vec(&self) -> Vec<(Token, Token)> {
+        match self {
+            Self::Parameters(d) => d.clone(),
+            
+            _ => panic!("cannot get params from this statement")
+        }
+    }
 }

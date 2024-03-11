@@ -1,8 +1,4 @@
-loop {
-    let x: ptr@u8;
-    let y: u8 = 5;
-
-    x = &y;
-
-    let z: u8 = *x;
+fn test(x: u8, y: u8) -> void {
+    
+    return void
 }

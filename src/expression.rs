@@ -11,6 +11,7 @@ pub enum Expr {
     Term(Box<BinaryExpr>),
     Shift(Box<BinaryExpr>),
     Unary(Box<UnaryExpr>),
+    FnCall(FnCall),
     Cast(Box<Cast>),
     Ref(Ref),
     Primary(Box<PrimaryExpr>),
@@ -45,6 +46,12 @@ pub struct Cast {
 pub struct Ref {
     pub operator: Token,
     pub right: Token,
+}
+
+#[derive(Clone, Debug)]
+pub struct FnCall {
+    pub name: Token,
+    pub args: Vec<Expr>
 }
 
 pub fn new_expr(t: &'static str) -> Expr {
@@ -89,6 +96,13 @@ pub fn new_expr(t: &'static str) -> Expr {
                 right: new_expr("Primary"),
             }
         )),
+
+        "FnCall" => {
+            Expr::FnCall(FnCall{
+                name: Token {ttype: TokenType::Arrow, pos: 0},
+                args: vec![]
+            }) 
+        }
 
         "Cast" => Expr::Cast(Box::new(Cast {
             value: new_expr("Base"),
@@ -236,7 +250,7 @@ impl Expr {
                         new_operator = p.peek(0);
                         p.advance();
                         
-                        let mut r = new_expr("Cast");
+                        let mut r = new_expr("FnCall");
                         r.parse(p)?;
                         
                         break 'b Expr::Unary(Box::new(
@@ -248,10 +262,48 @@ impl Expr {
                     } 
                 }
 
-                let mut e = new_expr("Cast");
+                let mut e = new_expr("FnCall");
                 e.parse(p)?
             }
         
+            Expr::FnCall(_) =>  'b: {
+                if matches!(p.peek(0).ttype, TokenType::Id(_))
+                && p.peek(1).ttype == TokenType::ParenOpen {
+                    
+                    let fn_name = p.peek(0);
+                    let mut args: Vec<Expr> = vec![];
+
+                    p.advance();
+                    p.advance();
+
+                    if p.peek(0).ttype != TokenType::ParenClose {
+                        loop {
+                            let arg = new_expr("Base").parse(p)?;
+                            args.push(arg);
+                            
+                            if p.peek(0).ttype == TokenType::ParenClose {
+                                p.advance();
+                                break
+                            }
+    
+                            if p.peek(0).ttype != TokenType::Comma {
+                                return Err("Expected Function Arguments to be Seperated by Commas")
+                            }
+                            
+                            p.advance();
+                        }    
+                    } else {
+                        p.advance();
+                    }
+
+                    break 'b Expr::FnCall(FnCall {
+                        name: fn_name,
+                        args: args })
+                }
+
+                new_expr("Cast").parse(p)?
+            }
+
             Expr::Cast(_) => 'b: {
                 let v = new_expr("Ref").parse(p)?;
 
@@ -313,7 +365,6 @@ impl Expr {
                 }
                 
                 //not a grouping if this point is reached
-
                 let e = match p.peek(0).ttype {
                     TokenType::Lit(_) => {
                         Expr::Primary(
@@ -349,6 +400,16 @@ impl std::fmt::Display for Expr {
             Self::Unary(d) => write!(f, "({} {})", d.operator.ttype, d.right),
             Self::Cast(d) => write!(f, "({} cast to {})", d.value, d.to_type.ttype),
             Self::Ref(d) => write!(f, "{} reference Op on {}", d.operator.data(), d.right.data()),
+            Self::FnCall(d) => {
+                write!(f, "function call of {}  params:", d.name.ttype)?;
+
+                for arg in &d.args {
+                    write!(f, "\narg: {}", arg)?;
+                }
+
+                Ok(())
+
+            },
             Self::Primary(d) => {
                 match *d.clone() {
                     PrimaryExpr::Grouping(v) => write!(f, "({})", v),
