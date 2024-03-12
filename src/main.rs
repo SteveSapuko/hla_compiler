@@ -6,7 +6,7 @@ mod statement;
 mod syntax;
 mod cgen;
 
-use crate::{lexer::*, parser::Parser, syntax::check_ast_syntax};
+use crate::{lexer::*, parser::*, syntax::*};
 use std::{fs::File, io::Read};
 
 fn main() {     

@@ -7,14 +7,17 @@ pub enum Statement {
     Base,
     Declr,
     FnDeclr(Box<FnDeclr>),
+    StructDeclr(Box<StructDeclr>),
+    EnumDeclr(Box<EnumDeclr>),
     Parameters(Vec<(Token, Token)>), //(name, type)
+    Variant(Vec<Token>),
     VarDeclr(VarDeclr),
     Stmt,
     LoopStmt(Box<Statement>), //must contain Statement::Block
     IfStmt(Box<CondStmt>),
     WhileStmt(Box<CondStmt>),
     BreakStmt(Token),
-    ReturnStmt(Token, Option<Expr>),
+    ReturnStmt(Token, Expr),
     ExprStmt(Expr),
     Block(Vec<Statement>),
 }
@@ -35,6 +38,18 @@ pub struct FnDeclr {
 }
 
 #[derive(Clone, Debug)]
+pub struct StructDeclr {
+    pub name: Token,
+    pub params: Statement, //Statement::parameters
+}
+
+#[derive(Clone, Debug)]
+pub struct EnumDeclr {
+    pub name: Token,
+    pub variants: Statement, //Statement::variant
+}
+
+#[derive(Clone, Debug)]
 pub struct CondStmt {
     pub cond: Expr,
     pub true_branch: Statement,
@@ -47,17 +62,32 @@ pub fn new_statement(t: &'static str) -> Statement{
         "Declr" => Statement::Declr,
         "FnDeclr" => {
             Statement::FnDeclr(Box::new(FnDeclr {
-                name: Token { ttype: TokenType::Arrow, pos: 0 },
+                name: BLANK_TOKEN,
                 params: new_statement("Base"),
-                ret_type: Token { ttype: TokenType::Arrow, pos: 0 },
+                ret_type: BLANK_TOKEN,
                 body: new_statement("Base") }))
         }
+
+        "StructDeclr" => {
+            Statement::StructDeclr(Box::new(StructDeclr {
+                name: BLANK_TOKEN,
+                params: new_statement("Base") }))
+        }
+
+        "EnumDeclr" => {
+            Statement::EnumDeclr(Box::new(EnumDeclr {
+                name: BLANK_TOKEN,
+                variants: new_statement("Base") }))
+        }
+
         "Params" => Statement::Parameters(vec![]),
+
+        "Variant" => Statement::Variant(vec![]),
         
         "VarDeclr" => {
             Statement::VarDeclr(VarDeclr {
-                name: Token { ttype: TokenType::Arrow, pos: 0 },
-                var_type: Token { ttype: TokenType::Arrow, pos: 0 },
+                name: BLANK_TOKEN,
+                var_type: BLANK_TOKEN,
                 value: None })
         },
         "Stmt" => Statement::Stmt,
@@ -80,10 +110,10 @@ pub fn new_statement(t: &'static str) -> Statement{
             true_branch: new_statement("Block"),
             false_branch: None })),
         
-        "BreakStmt" => {Statement::BreakStmt(Token { ttype: TokenType::Arrow, pos: 0 },)},
+        "BreakStmt" => {Statement::BreakStmt(BLANK_TOKEN,)},
         
-        "ReturnStmt" => {Statement::ReturnStmt(Token { ttype: TokenType::Arrow, pos: 0 }, None)}
-        _ => panic!("Need to implement new_statement")
+        "ReturnStmt" => {Statement::ReturnStmt(BLANK_TOKEN, new_expr("Base"))}
+        _ => panic!("Need to implement new_statement for {}", t)
     }
 }
 
@@ -101,6 +131,16 @@ impl Statement {
                 if p.peek(0).ttype == TokenType::Key("fn".to_string()) {
                     p.advance();
                     break 'b new_statement("FnDeclr").parse(p)?
+                }
+
+                if p.peek(0).ttype == TokenType::Key("struct".to_string()) {
+                    p.advance();
+                    break 'b new_statement("StructDeclr").parse(p)?
+                }
+
+                if p.peek(0).ttype == TokenType::Key("enum".to_string()) {
+                    p.advance();
+                    break 'b new_statement("EnumDeclr").parse(p)?
                 }
 
                 new_statement("Stmt").parse(p)?
@@ -153,6 +193,86 @@ impl Statement {
                     ret_type: ret_type,
                     body: body }
                 ))
+            }
+
+            Statement::StructDeclr(_) => {
+                if !matches!(p.peek(0).ttype, TokenType::Id(_)) {
+                    return Err("Expected Identifier for Struct Name")
+                }
+                let name = p.peek(0);
+                p.advance();
+
+                if !matches!(p.peek(0).ttype, TokenType::CurlyOpen) {
+                    return Err("Expected Curly Bracket after Struct Name")
+                }
+                p.advance();
+
+
+                let mut params = new_statement("Params");
+                if !matches!(p.peek(0).ttype, TokenType::CurlyClose) {
+                    params.parse(p)?;
+                }
+
+                if !matches!(p.peek(0).ttype, TokenType::CurlyClose) {
+                    return Err("Expected Closing Curly Bracket after Struct Declaration")
+                }
+                p.advance();
+
+                Statement::StructDeclr(Box::new(StructDeclr {
+                    name: name,
+                    params: params }))
+            }
+
+            Statement::EnumDeclr(_) => {
+                if !matches!(p.peek(0).ttype, TokenType::Id(_)) {
+                    return Err("Expected Identifier for Enum Name")
+                }
+                let name = p.peek(0);
+                p.advance();
+
+                if !matches!(p.peek(0).ttype, TokenType::CurlyOpen) {
+                    return Err("Expected Curly Bracket after Enum Name")
+                }
+                p.advance();
+
+                let mut variants = new_statement("Variant");
+                if !matches!(p.peek(0).ttype, TokenType::CurlyClose) {
+                    variants.parse(p)?;
+                }
+
+                if !matches!(p.peek(0).ttype, TokenType::CurlyClose) {
+                    return Err("Expected Closing Curly Bracket after Enum Declaration")
+                }
+                p.advance();
+
+                Statement::EnumDeclr(Box::new(EnumDeclr {
+                    name: name,
+                    variants: variants }))
+            }
+
+            Statement::Variant(_) => {
+                let mut variant_vec: Vec<Token> = vec![];
+
+                if !matches!(p.peek(0).ttype, TokenType::Id(_)) {
+                    return Err("Expected Identifier for Variant Name")
+                }
+                let param_name = p.peek(0);
+                p.advance();
+
+                variant_vec.push(param_name);
+                
+                while p.peek(0).ttype == TokenType::Comma {
+                    p.advance();
+                    
+                    if !matches!(p.peek(0).ttype, TokenType::Id(_)) {
+                        return Err("Expected Identifier for Variant Name")
+                    }
+                    let param_name = p.peek(0);
+                    p.advance();
+    
+                    variant_vec.push(param_name);
+                }
+                Statement::Variant(variant_vec)
             }
 
             Statement::Parameters(_) => {
@@ -293,17 +413,12 @@ impl Statement {
                 Statement::ExprStmt(e)
             }
 
-            Statement::ReturnStmt(r, _) => {
-                let mut return_value = None;
-                
-                if p.peek(0).ttype != TokenType::SemiCol {
-                    let value = new_expr("Base").parse(p)?;
-                    return_value = Some(value);
-                } else {
-                    p.advance();
-                }
+            Statement::ReturnStmt(_, _) => {
+                let r = p.peek(-1);
 
-                Statement::ReturnStmt(r.clone(), return_value)
+                let value = new_expr("Base").parse(p)?;
+
+                Statement::ReturnStmt(r, value)
             }
 
             Statement::LoopStmt(_) => {
@@ -404,21 +519,26 @@ impl std::fmt::Display for Statement {
             Statement::LoopStmt(d) => write!(f, "Loop {}", *d),
             Statement::IfStmt(d) => write!(f, "If {} then {}\nelse {}", d.cond, d.true_branch, d.false_branch.unwrap_or(new_statement("Base"))),
             Statement::WhileStmt(d) => write!(f, "While {} do {}", d.cond, d.true_branch),
-            Statement::BreakStmt(d) => write!(f, "Break"),
+            Statement::BreakStmt(_) => write!(f, "Break"),
             Statement::FnDeclr(d) => write!(f, "define function: {}   params: {}  \nret type: {}   body: {}", d.name.ttype, d.params, d.ret_type.ttype, d.body),
-            Statement::ReturnStmt(t, d) => {
-                match d {
-                    Some(t) => write!(f, "return {}", t),
-                    None => write!(f,"return")
-                }
-            }
+            Statement::ReturnStmt(t, d) => write!(f, "return {}", d),
             Statement::Parameters(d) => {
                 for p in d {
                     write!(f, "\nparam name: {}   param type: {}", p.0.ttype, p.1.ttype)?;
                 }
                 Ok(())
             }
-            _ => panic!("implement stmt display")
+            Statement::Variant(v) => {
+                for i in v  {
+                    write!(f, "\nvariant: {}", i.ttype)?;
+                }
+
+                Ok(())
+            }
+            Statement::StructDeclr(s) => write!(f, "Declare Struct {} Params: {}", s.name.ttype, s.params),
+            Statement::EnumDeclr(e) => write!(f, "Declare Enum {} variants: {}", e.name.ttype, e.variants),
         }
     }
 }
+
+//_ => panic!("implement stmt display")

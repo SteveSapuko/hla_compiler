@@ -16,9 +16,23 @@ impl Parser {
     }
 
     pub fn peek(&self, n: i64) -> Token {
-        let temp = self.tokens[(self.ptr as i64 + n) as usize].clone();
+        let peek_location: usize = (self.ptr as i64 + n) as usize;
+        
+        let temp = self.tokens[peek_location].clone();
         //println!("{:?}", temp);
         return temp
+    }
+
+    pub fn peek_forward(&self, n: i64) -> Option<Token> {
+        let peek_location: usize = (self.ptr as i64 + n) as usize;
+        
+        if peek_location >= self.tokens.len() {
+            return None
+        }
+
+        let temp = self.tokens[peek_location].clone();
+        //println!("{:?}", temp);
+        return Some(temp)
     }
 
     pub fn advance(&mut self) {
@@ -30,7 +44,7 @@ impl Parser {
     pub fn parse(&mut self) -> Result<Vec<Statement>, &'static str> {
         let mut program: Vec<Statement> = vec![];
         
-        self.make_ptr_types();
+        //self.make_ptr_types();
 
         while self.peek(0).ttype != TokenType::EOF {
             program.push( new_statement("Base").parse(self)?);
@@ -39,7 +53,7 @@ impl Parser {
         Ok(program)
     }
 
-    fn make_ptr_types(&mut self) {
+    /*fn make_ptr_types(&mut self) {
         while self.peek(0).ttype != TokenType::EOF {
             if self.peek(0).ttype == TokenType::Key("ptr@".to_string()) {
                 if matches!(self.peek(1).ttype, TokenType::Id(_)) {
@@ -53,6 +67,8 @@ impl Parser {
             }
             self.advance();
         }
+
+        println!("{:#?}", self.tokens);
         self.ptr = 0;
-    }
+    }*/
 }

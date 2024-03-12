@@ -30,11 +30,12 @@ impl Lexer {
         ^for |
         ^return |
         ^continue |
-        ^ptr@ |
+        ^struct |
+        ^enum |
         ^break").unwrap();
 
         let reg_op = Regex::new(r"(?x)
-        ^ as |
+        ^ as(?=\s) |
         ^ \= (?!\=) |
         ^ \+ |
         ^ \- |
@@ -55,7 +56,7 @@ impl Lexer {
         ^ > (?!>) |
         ^ \=\=").unwrap();
 
-        let reg_id = Regex::new(r"^[[:alpha:]][[:alnum:]]*").unwrap();
+        let reg_id = Regex::new(r"^[_[[:alpha:]]][_@[[:alnum:]]]*").unwrap();
 
         let reg_lit = Regex::new(r"^-?\d+(?![[:alpha:]])").unwrap();
 
@@ -117,6 +118,7 @@ impl Lexer {
                 b';' => {token_list.push(Token {ttype: TokenType::SemiCol, pos: self.ptr}); self.ptr += 1; continue},
                 b':' => {token_list.push(Token {ttype: TokenType::Col, pos: self.ptr}); self.ptr += 1; continue},
                 b',' => {token_list.push(Token {ttype: TokenType::Comma, pos: self.ptr}); self.ptr += 1; continue},
+                b'.' => {token_list.push(Token {ttype: TokenType::Period, pos: self.ptr}); self.ptr += 1; continue},
                 _ => {}
             }
 

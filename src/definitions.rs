@@ -28,6 +28,7 @@ pub enum TokenType {
     SemiCol,
     Col,
     Comma,
+    Period,
     Arrow,
     EOF,
 }
@@ -63,94 +64,10 @@ impl std::fmt::Display for TokenType {
             Self::Col => write!(f, ":"),
             Self::Arrow => write!(f, "->"),
             Self::EOF => write!(f, "EOF"),
-            Self::Comma => write!(f, ",")
+            Self::Comma => write!(f, ","),
+            Self::Period => write!(f, "."),
         }
     }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum VarType {
-    Pointer(Box<VarType>),
-    U8,
-    I8,
-    U16,
-    I16,
-    U32,
-    I32,
-    U64,
-    I64,
-    UserStruct(UserStruct),
-    Void,
-    Array(u16, Box<VarType>)
-}
-
-impl VarType {
-    pub fn size(&self) -> u16 {
-        match self {
-            Self::U8 => 1,
-            Self::I8 => 1,
-            Self::U16 => 2,
-            Self::I16 => 2,
-            Self::U32 => 4,
-            Self::I32 => 4,
-            Self::U64 => 8,
-            Self::I64 => 8,
-            Self::Pointer(_) => 2,
-            Self::UserStruct(s) => {
-                let mut sum: u16 = 0;
-                for t in &s.fields {
-                    sum += t.1.size();
-                }
-                sum
-            }
-            Self::Void => 0,
-            Self::Array(s, _) => *s
-
-        }
-    }
-
-    pub fn from(t: &str, defined_types: &Vec<UserStruct>) -> Result<Self, &'static str> {
-        //println!("doing {}", t);
-        match t.to_lowercase().as_str() {
-            "u8" => Ok(Self::U8),
-            "i8" => Ok(Self::I8),
-
-            "u16" => Ok(Self::U16),
-            "i16" => Ok(Self::I16),
-
-            "u32" => Ok(Self::U32),
-            "i32" => Ok(Self::I32),
-
-            "u64" => Ok(Self::U64),
-            "i64" => Ok(Self::I64),
-
-            _ => {
-                if t.len() >= 4 {
-                    if &t[0..4] == "ptr@" {
-                        return Ok(VarType::Pointer(Box::new(VarType::from(&t[4..], defined_types)?)))
-                    }
-                }
-
-                if t == "void" {
-                    return Ok(VarType::Void)
-                }
-                
-                for user_type in defined_types {
-                    if t == user_type.name {
-                        return Ok(VarType::UserStruct(user_type.clone()))
-                    }
-                }
-
-                return Err("Undefined Type")
-            }
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct UserStruct {
-    pub name: String,
-    pub fields: Vec<(String, VarType)>
 }
 
 impl Statement {
@@ -162,3 +79,9 @@ impl Statement {
         }
     }
 }
+
+pub static RESERVED_IDS: [&str; 1] = [
+    "void",
+];
+
+pub const BLANK_TOKEN: Token = Token { ttype: TokenType::Arrow, pos: 0 };

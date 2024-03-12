@@ -22,6 +22,8 @@ pub enum PrimaryExpr {
     Grouping(Expr),
     Literal(Token),
     Id(Token),
+    StructField(Token, Token),
+    EnumVariant(Token, Token),
 }
 
 #[derive(Clone, Debug)]
@@ -110,10 +112,10 @@ pub fn new_expr(t: &'static str) -> Expr {
         })),
 
         "Ref" => Expr::Ref(Ref {
-            operator: Token { ttype: TokenType::Arrow, pos: 0 },
-            right: Token { ttype: TokenType::Arrow, pos: 0 } }),
+            operator: BLANK_TOKEN,
+            right: BLANK_TOKEN }),
 
-        "Primary" => Expr::Primary(Box::new(PrimaryExpr::Literal(Token { ttype: TokenType::Arrow, pos: 0 }))),
+        "Primary" => Expr::Primary(Box::new(PrimaryExpr::Literal(BLANK_TOKEN))),
         _ => panic!("new_expr invalid syntax -- {}", t)
     }
 }
@@ -363,8 +365,53 @@ impl Expr {
                     ))
 
                 }
+
+
+                //redo this
+                //enum variant
+                if matches!(p.peek(0).ttype, TokenType::Id(_)) {
+                    if let Some(col1) = p.peek_forward(1) {
+                        if col1.ttype == TokenType::Col {
+                            if let Some(col2) = p.peek_forward(2) {
+                                if col2.ttype == TokenType::Col {
+                                    if let Some(id2) = p.peek_forward(3) {
+                                        if matches!(id2.ttype, TokenType::Id(_)) {
+                                            p.advance();
+                                            p.advance();
+                                            p.advance();
+                                            p.advance();
+                                            break 'b Expr::Primary(Box::new(PrimaryExpr::EnumVariant(p.peek_forward(-4).unwrap(), p.peek_forward(-1).unwrap())))
+                                        }
+                                        
+                                    }
+                                }
+                                
+                            }
+                        }
+                        
+                    }
+                }
                 
-                //not a grouping if this point is reached
+                
+                //structField
+                if matches!(p.peek(0).ttype, TokenType::Id(_)) {
+                    if let Some(period) = p.peek_forward(1) {
+                        if period.ttype == TokenType::Period {
+                                println!("reached here");
+                                if let Some(id2) = p.peek_forward(2) {
+                                    if matches!(id2.ttype, TokenType::Id(_)) {
+                                        p.advance();
+                                        p.advance();
+                                        p.advance();
+                                        break 'b Expr::Primary(Box::new(PrimaryExpr::StructField(p.peek_forward(-3).unwrap(), p.peek_forward(-1).unwrap())))    
+                                    }
+                                }
+                            }
+                        }
+                        
+                    }
+
+                //ID or Literal if this point is reached
                 let e = match p.peek(0).ttype {
                     TokenType::Lit(_) => {
                         Expr::Primary(
@@ -415,6 +462,8 @@ impl std::fmt::Display for Expr {
                     PrimaryExpr::Grouping(v) => write!(f, "({})", v),
                     PrimaryExpr::Literal(v) => write!(f, "{}", v.ttype),
                     PrimaryExpr::Id(v) => write!(f, "{}", v.ttype), 
+                    PrimaryExpr::EnumVariant(t1, t2) => write!(f, "varint {} of enum {}", t2.ttype,  t1.ttype),
+                    PrimaryExpr::StructField(s, field) => write!(f, "field {} of struct {}", field.ttype, s.ttype)
                 }
             }
         }
