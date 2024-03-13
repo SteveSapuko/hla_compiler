@@ -14,8 +14,97 @@ pub fn check_ast_syntax(ast: Vec<Statement>) -> Result<(), SyntaxErr> {
         defined_types: vec![],
         used_ids: vec![]};
 
+
+    define_types_in_scope(&ast, &mut ss)?;
     for statement in ast {
         statement.check_syntax(&mut ss)?;
+    }
+
+    Ok(())
+}
+
+fn define_types_in_scope(ast: &Vec<Statement>, ss: &mut ScopeStack) -> Result<(), SyntaxErr> {
+    let mut types_to_recheck: Vec<UserStructDef> = vec![];
+
+    //to allow for pointers to the struct
+    let mut temp_defined_types: Vec<UserType> = ss.defined_types.clone();
+    
+    for stmt in ast {
+        match stmt {
+            Statement::StructDeclr(declr) => {
+                let struct_name = declr.name.clone();
+
+                if ss.used_ids.contains(&struct_name.data()) {
+                    return Err(SyntaxErr::AlreadyDefined(struct_name))
+                }
+
+                let mut params: Vec<(String, FieldType)> = vec![];
+                let mut needs_rechecking = false;
+
+                for param in declr.params.get_param_vec() {
+                    let param_type = match VarType::from(&param.1.data(), &ss.defined_types) {
+                        Ok(t) => FieldType::Defined(t),
+                        Err(_) => {needs_rechecking = true; FieldType::Undefined(param.1)}
+                    };
+
+                    params.push((param.0.data(), param_type));
+                }
+
+                let current_definition = UserStructDef {
+                    name: struct_name.data(),
+                    fields: params };
+                
+                if needs_rechecking {
+                    types_to_recheck.push(current_definition.clone());
+                    temp_defined_types.push(UserType::UserStruct(current_definition));
+                } else {
+                    ss.user_type_declr(UserType::UserStruct(current_definition));
+                }
+            }
+
+            Statement::EnumDeclr(declr) => {
+                //needs to be expanded
+                if ss.used_ids.contains(&declr.name.data()) {
+                    return Err(SyntaxErr::AlreadyDefined(declr.name.clone()))
+                }
+
+                let mut e_variants: Vec<String> = vec![];
+
+                if let Statement::Variant(variants) = declr.variants.clone() {
+                    for v in variants {
+                        e_variants.push(v.data());
+                    }
+                }
+
+                let user_enum = UserType::UserEnum(UserEnumDef {
+                    name: declr.name.data(),
+                    variants: e_variants });
+
+                ss.user_type_declr(user_enum.clone());
+                temp_defined_types.push(user_enum);
+            }
+
+            _ => {}
+        }
+    }
+
+    for checking_struct in types_to_recheck.iter_mut() {
+        for field in checking_struct.fields.iter_mut() {
+            if let FieldType::Undefined(field_type) = field.1.clone() {
+                if field_type.data() == checking_struct.name {
+                    return Err(SyntaxErr::RecursiveStruct(field_type))
+                }
+
+                let resolved_field_type = match VarType::from(&field_type.data(), &temp_defined_types) {
+                    Ok(t) => t,
+                    Err(e) => {return Err(SyntaxErr::UnknownType(field_type, e))}
+                };
+
+                field.1 = FieldType::Defined(resolved_field_type);
+            }
+        }
+
+        ss.user_type_declr(UserType::UserStruct(checking_struct.clone()));
     }
 
     Ok(())
@@ -27,6 +116,7 @@ impl Statement {
         match self.clone() {
             Self::Block(body) => {
                 ss.enter_scope();
+                define_types_in_scope(&body, ss)?;
 
                 for stmt in body {
                     stmt.check_syntax(ss)?;
@@ -105,51 +195,9 @@ impl Statement {
                 ss.var_declr(declr.name.data(), declared_type);
             }
 
-            Self::StructDeclr(declr) => {
-                let struct_name = declr.name;
-
-                if ss.used_ids.contains(&struct_name.data()) {
-                    return Err(SyntaxErr::AlreadyDefined(struct_name))
-                }
-
-                let mut params: Vec<(String, VarType)> = vec![];
-
-                for param in declr.params.get_param_vec() {
-                    let param_type = match VarType::from(&param.1.data(), &ss.defined_types) {
-                        Ok(t) => t,
-                        Err(e) => return Err(SyntaxErr::UnknownType(param.1, e))
-                    };
-
-                    params.push((param.0.data(), param_type));
-                }
-
-                ss.user_type_declr(UserType::UserStruct(UserStructDef {
-                    name: struct_name.data(),
-                    fields: params }));
-                
-                return Ok(())
-            }
+            Self::StructDeclr(_) => {}
             
-            Self::EnumDeclr(declr) => {
-                //needs to be expanded
-                if ss.used_ids.contains(&declr.name.data()) {
-                    return Err(SyntaxErr::AlreadyDefined(declr.name))
-                }
-
-                let mut e_variants: Vec<String> = vec![];
-
-                if let Statement::Variant(variants) = declr.variants {
-                    for v in variants {
-                        e_variants.push(v.data());
-                    }
-                }
-
-
-
-                ss.user_type_declr(UserType::UserEnum(UserEnumDef {
-                    name: declr.name.data(),
-                    variants: e_variants }))
-            }
+            Self::EnumDeclr(_) => {}
 
             Self::LoopStmt(body) => {
                 ss.enter_breakable();
@@ -429,7 +477,7 @@ impl Expr {
                                 }
                             };
 
-                            return Ok(field_type)
+                            return Ok(field_type.unwrap())
                         }
                         
                         return Err(SyntaxErr::NotAStruct(s_name))
@@ -478,5 +526,6 @@ pub enum SyntaxErr {
     UnknownVariant(Token),
     UnknownField(Token),
     NotAStruct(Token),
+    RecursiveStruct(Token)
 }
 

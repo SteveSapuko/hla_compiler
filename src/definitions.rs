@@ -80,8 +80,9 @@ impl Statement {
     }
 }
 
-pub static RESERVED_IDS: [&str; 1] = [
+pub static RESERVED_IDS: [&str; 2] = [
     "void",
+    "ptr@",
 ];
 
 pub const BLANK_TOKEN: Token = Token { ttype: TokenType::Arrow, pos: 0 };

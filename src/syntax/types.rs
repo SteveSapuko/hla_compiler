@@ -1,3 +1,5 @@
+use crate::definitions::*;
+
 #[derive(Debug, Clone)]
 pub struct VarData {
     pub name: String,
@@ -36,7 +38,7 @@ impl VarType {
             Self::UserStruct(s) => {
                 let mut sum: u16 = 0;
                 for t in &s.fields {
-                    sum += t.1.size();
+                    sum += t.1.unwrap().size();
                 }
                 sum
             }
@@ -46,7 +48,7 @@ impl VarType {
             Self::UserStruct(s) => {
                 let mut sum: u16 = 0;
                 for field in &s.fields {
-                    sum += field.1.size();
+                    sum += field.1.unwrap().size();
                 }
 
                 sum
@@ -124,17 +126,32 @@ impl UserType {
 #[derive(Debug, Clone, PartialEq)]
 pub struct UserStructDef {
     pub name: String,
-    pub fields: Vec<(String, VarType)>
+    pub fields: Vec<(String, FieldType)>
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum FieldType {
+    Defined(VarType),
+    Undefined(Token),
+}
+
+impl FieldType {
+    pub fn unwrap(&self) -> VarType {
+        match self {
+            FieldType::Defined(t) => t.clone(),
+            FieldType::Undefined(s) => panic!("Undefined Field Type {}", s.data())
+        }
+    }
 }
 
 impl UserStructDef {
-    pub fn get_field_type(&self, name: String) -> Option<VarType> {
+    pub fn get_field_type(&self, name: String) -> Option<FieldType> {
         for f in self.fields.clone() {
             if f.0 == name {
                 return Some(f.1)
             }
         }
-        None
+        return None
     }
 }
 

@@ -1,21 +1,4 @@
-struct foo {
-    x: u8,
-    y: u16
-}
-
-enum Result {
-    Ok,
-    Err
-}
-
-fn main() -> void {
-    let bar: foo;
-    bar.x = 1;
-    bar.y = 0 as u16;
-
-    while bar.y < 1000 {
-        bar.y = bar.y + bar.x;
-    }
-    
-    return void
+struct Foo {
+    x: ptr@Foo,
+    y: ptr@Bar
 }
