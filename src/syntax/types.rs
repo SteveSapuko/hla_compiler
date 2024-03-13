@@ -45,14 +45,6 @@ impl VarType {
             Self::Void => 0,
             Self::Array(s, _) => *s,
             Self::UserEnum(_) => 1,
-            Self::UserStruct(s) => {
-                let mut sum: u16 = 0;
-                for field in &s.fields {
-                    sum += field.1.unwrap().size();
-                }
-
-                sum
-            }
             _ => panic!()
 
         }

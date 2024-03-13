@@ -1,4 +1,8 @@
 struct Foo {
-    x: ptr@Foo,
-    y: ptr@Bar
+    x: u8,
+    y: u16
 }
+
+let x: Foo;
+x.y = 256;
+

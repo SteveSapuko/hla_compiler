@@ -521,7 +521,7 @@ impl std::fmt::Display for Statement {
             Statement::WhileStmt(d) => write!(f, "While {} do {}", d.cond, d.true_branch),
             Statement::BreakStmt(_) => write!(f, "Break"),
             Statement::FnDeclr(d) => write!(f, "define function: {}   params: {}  \nret type: {}   body: {}", d.name.ttype, d.params, d.ret_type.ttype, d.body),
-            Statement::ReturnStmt(t, d) => write!(f, "return {}", d),
+            Statement::ReturnStmt(_, d) => write!(f, "return {}", d),
             Statement::Parameters(d) => {
                 for p in d {
                     write!(f, "\nparam name: {}   param type: {}", p.0.ttype, p.1.ttype)?;

@@ -47,18 +47,6 @@ impl ScopeStack {
         self.used_ids.push(name.clone());
     }
 
-    pub fn get_user_struct(&self, name: String) -> Option<UserStructDef> {
-        for user_type in self.defined_types.iter().rev() {
-            if let UserType::UserStruct(e) = user_type {
-                if e.name == name {
-                    return Some(e.clone())
-                }
-            }
-        }
-
-        None
-    }
-
     pub fn get_user_enum(&self, name: String) -> Option<UserEnumDef> {
         for user_type in self.defined_types.iter().rev() {
             if let UserType::UserEnum(e) = user_type {
