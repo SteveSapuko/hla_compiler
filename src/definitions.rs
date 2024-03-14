@@ -1,4 +1,5 @@
 use super::statement::*;
+use super::parser::Parser;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token {
@@ -80,9 +81,70 @@ impl Statement {
     }
 }
 
-pub static RESERVED_IDS: [&str; 2] = [
+#[derive(Debug, Clone, PartialEq)]
+pub enum DeclrType {
+    BasicType(Token),
+    Array(Box<DeclrType>, Token),
+    Pointer(Box<DeclrType>),
+}
+
+impl DeclrType {
+    pub fn get_token(&self) -> Token {
+        match self.clone() {
+            Self::BasicType(t) => t,
+            Self::Array(t, s) => t.get_token(),
+            Self::Pointer(t) => t.get_token(),
+        }
+    }
+}
+
+pub fn parse_type(p: &mut Parser) -> Result<DeclrType, &'static str> {
+    let vtype;
+    
+    if matches!(p.peek(0).ttype, TokenType::Id(_)) {
+        vtype = DeclrType::BasicType(p.peek(0));
+        p.advance();
+
+    } else if p.peek(0).ttype == TokenType::SquareOpen {
+        p.advance();
+        
+        let array_type = parse_type(p)?;
+
+        if p.peek(0).ttype != TokenType::SemiCol {
+            return Err("Expected Semicolon after Array Type")
+        }
+        p.advance();
+
+        if !matches!(p.peek(0).ttype, TokenType::Lit(_)) {
+            return Err("Expected Literal for Array Size")
+        }
+
+        let array_size = p.peek(0);
+        p.advance();
+        
+        if p.peek(0).ttype != TokenType::SquareClose {
+            return Err("Expected Closing Square Bracket after Array Size")
+        }
+        p.advance();
+
+        vtype = DeclrType::Array(Box::new(array_type), array_size)
+
+    } else if p.peek(0).ttype == TokenType::Key("@".to_string()){
+        p.advance();
+        let points_to_type = parse_type(p)?;
+        return Ok(DeclrType::Pointer(Box::new(points_to_type)))
+
+    } else {
+        return Err("Cannot Parse Type")
+    }
+    
+    
+    Ok(vtype)
+}
+
+
+pub static RESERVED_IDS: [&str; 1] = [
     "void",
-    "ptr@",
 ];
 
 pub const BLANK_TOKEN: Token = Token { ttype: TokenType::Arrow, pos: 0 };

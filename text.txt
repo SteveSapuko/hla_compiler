@@ -1,8 +1,5 @@
-struct Test {
-    x: u8,
-    y: u32
-}
+let v: u8;
+let pv: @u8 = &v;
+let offset: u16 = 0 as u16;
 
-let x: [Test; 5];
-
-x[0 as u16];
+pv[offset];

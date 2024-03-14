@@ -329,9 +329,9 @@ impl Expr {
             Self::Cast(cast) => {
                 // no casting to a struct
 
-                match VarType::from_token(cast.to_type.clone()) {
+                match VarType::from(cast.to_type.clone(), &ss.defined_types) {
                     Ok(t) => Ok(t),
-                    Err(e) => return Err(SyntaxErr::UnknownType(cast.to_type, e))
+                    Err(e) => return Err(SyntaxErr::UnknownType(cast.to_type.get_token(), e))
                 }
 
             }
@@ -508,6 +508,7 @@ impl Expr {
 
                         let element_type = match array {
                             VarType::Array(t, _) => *t,
+                            VarType::Pointer(t) => *t,
                             _ => return Err(SyntaxErr::NotAnArray(a_name))
                         };
                         

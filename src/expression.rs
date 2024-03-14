@@ -42,7 +42,7 @@ pub struct UnaryExpr {
 #[derive(Clone, Debug)]
 pub struct Cast {
     pub value: Expr,
-    pub to_type: Token
+    pub to_type: DeclrType
 }
 
 #[derive(Clone, Debug)]
@@ -109,7 +109,7 @@ pub fn new_expr(t: &'static str) -> Expr {
 
         "Cast" => Expr::Cast(Box::new(Cast {
             value: new_expr("Base"),
-            to_type: Token {ttype: TokenType::Arrow, pos: 0},
+            to_type: DeclrType::BasicType(BLANK_TOKEN),
         })),
 
         "Ref" => Expr::Ref(Ref {
@@ -313,16 +313,12 @@ impl Expr {
                 if p.peek(0).ttype == TokenType::Op("as".to_string()) {
                     p.advance();
 
-                    if !matches!(p.peek(0).ttype, TokenType::Id(_)) {
-                        return Err("Expected Identifier for Cast Type")
-                    }
-
-                    p.advance();
+                    let to_type = parse_type(p)?;
 
                     break 'b Expr::Cast(Box::new(
                         Cast {
                             value: v,
-                            to_type: p.peek(-1)
+                            to_type: to_type
                         }
                     ))
                 }
@@ -464,7 +460,7 @@ impl std::fmt::Display for Expr {
             Self::Term(d) => write!(f, "({} {} {})", d.left, d.operator.ttype, d.right),
             Self::Shift(d) => write!(f, "({} {} {})", d.left, d.operator.ttype, d.right),
             Self::Unary(d) => write!(f, "({} {})", d.operator.ttype, d.right),
-            Self::Cast(d) => write!(f, "({} cast to {})", d.value, d.to_type.ttype),
+            Self::Cast(d) => write!(f, "({} cast to {})", d.value, d.to_type),
             Self::Ref(d) => write!(f, "{} reference Op on {}", d.operator.data(), d.right.data()),
             Self::FnCall(d) => {
                 write!(f, "function call of {}  params:", d.name.ttype)?;

@@ -1,5 +1,3 @@
-use crate::definitions::*;
-
 use super::DeclrType;
 
 #[derive(Debug, Clone)]
@@ -50,10 +48,6 @@ impl VarType {
             _ => panic!()
 
         }
-    }
-
-    pub fn from_token(s: Token) -> Result<Self, &'static str> {
-        VarType::from(DeclrType::BasicType(s), &vec![])
     }
 
     pub fn from(t: DeclrType, defined_types: &Vec<UserType>) -> Result<Self, &'static str> {
