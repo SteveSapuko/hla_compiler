@@ -42,7 +42,7 @@ fn define_types_in_scope(ast: &Vec<Statement>, ss: &mut ScopeStack) -> Result<()
                 let mut needs_rechecking = false;
 
                 for param in declr.params.get_param_vec() {
-                    let param_type = match VarType::from(&param.1.data(), &ss.defined_types) {
+                    let param_type = match VarType::from(param.1.clone(), &ss.defined_types) {
                         Ok(t) => FieldType::Defined(t),
                         Err(_) => {needs_rechecking = true; FieldType::Undefined(param.1)}
                     };
@@ -91,13 +91,16 @@ fn define_types_in_scope(ast: &Vec<Statement>, ss: &mut ScopeStack) -> Result<()
     for checking_struct in types_to_recheck.iter_mut() {
         for field in checking_struct.fields.iter_mut() {
             if let FieldType::Undefined(field_type) = field.1.clone() {
-                if field_type.data() == checking_struct.name {
-                    return Err(SyntaxErr::RecursiveStruct(field_type))
+                if field_type.to_string() == checking_struct.name {
+                    if let DeclrType::BasicType(basic) = field_type {
+                        return Err(SyntaxErr::RecursiveStruct(basic))
+                    }
+                    panic!("should not have gotten here")
                 }
 
-                let resolved_field_type = match VarType::from(&field_type.data(), &temp_defined_types) {
+                let resolved_field_type = match VarType::from(field_type.clone(), &temp_defined_types) {
                     Ok(t) => t,
-                    Err(e) => {return Err(SyntaxErr::UnknownType(field_type, e))}
+                    Err(e) => {return Err(SyntaxErr::UnknownType(field_type.get_token(), e))}
                 };
 
                 field.1 = FieldType::Defined(resolved_field_type);
@@ -139,9 +142,9 @@ impl Statement {
                 ss.enter_func_def();
                 
                 for param in declr.params.get_param_vec() {
-                    let declared_type = match VarType::from(&param.1.data(), &ss.defined_types) {
+                    let declared_type = match VarType::from(param.1.clone() , &ss.defined_types) {
                         Ok(t) => t,
-                        Err(e) => {return Err(SyntaxErr::UnknownType(param.1.clone(), e))}
+                        Err(e) => {return Err(SyntaxErr::UnknownType(param.1.get_token(), e))}
                     };
 
                     param_names.push(param.0.clone());
@@ -177,10 +180,11 @@ impl Statement {
                     return Err(SyntaxErr::AlreadyDefined(declr.name))
                 }
                 
-                let declared_type = match VarType::from(&declr.var_type.data(), &ss.defined_types) {
+                let declared_type: VarType = match VarType::from(declr.var_type.clone(), &ss.defined_types){
                     Ok(t) => t,
-                    Err(e) => {return Err(SyntaxErr::UnknownType(declr.var_type.clone(), e))}
+                    Err(e) => return Err(SyntaxErr::UnknownType(declr.var_type.get_token(), e))
                 };
+
                 
                 if let Some(value) = declr.value {
                     let value_type = value.check_syntax(ss)?;  
@@ -233,7 +237,7 @@ impl Statement {
 
                     match f {
                         Some(declr) => {
-                            let ret_type = VarType::from(&declr.ret_type.data(), &ss.defined_types).expect("should have been handled");
+                            let ret_type = VarType::from(declr.ret_type, &ss.defined_types).expect("should have been handled");
                             
                             if ret_type == actual_return_type {
                                 return Ok(())
@@ -325,7 +329,7 @@ impl Expr {
             Self::Cast(cast) => {
                 // no casting to a struct
 
-                match VarType::from(&cast.to_type.data(), &ss.defined_types) {
+                match VarType::from_token(cast.to_type.clone()) {
                     Ok(t) => Ok(t),
                     Err(e) => return Err(SyntaxErr::UnknownType(cast.to_type, e))
                 }
@@ -348,9 +352,9 @@ impl Expr {
                     let calling_type = call.args[n].check_syntax(ss)?;
 
                     let expected_type = template.params.get_param_vec()[n].1.clone();
-                    let expected_type = match VarType::from(&expected_type.data(), &vec![]) {
+                    let expected_type = match VarType::from(expected_type.clone(), &vec![]) {
                         Ok(t) => t,
-                        Err(e) => return Err(SyntaxErr::UnknownType(expected_type, e))
+                        Err(e) => return Err(SyntaxErr::UnknownType(expected_type.get_token(), e))
                     };
 
                     if calling_type != expected_type {
@@ -358,7 +362,7 @@ impl Expr {
                     }
                 }
 
-                Ok(VarType::from(&template.ret_type.data(), &vec![]).expect("template should have been checked first"))
+                Ok(VarType::from(template.ret_type, &vec![]).expect("template should have been checked first"))
             }
 
             Self::Ref(r) => {
@@ -495,6 +499,27 @@ impl Expr {
 
                         return Ok(VarType::UserEnum(user_enum))
                     }
+                
+                    PrimaryExpr::ArrayAccess(a_name, a_index) => {
+                        let array = match ss.get_var_t(a_name.data()) {
+                            Some(t) => t,
+                            None => return Err(SyntaxErr::Undeclared(a_name))
+                        };
+
+                        let element_type = match array {
+                            VarType::Array(t, _) => *t,
+                            _ => return Err(SyntaxErr::NotAnArray(a_name))
+                        };
+                        
+                        let index_type = a_index.check_syntax(ss)?;
+                        if index_type != VarType::U16 {
+                            return Err(SyntaxErr::WrongType(VarType::U16, index_type))
+                        }
+                        
+                        return Ok(element_type)
+                    }
+
+                    
                 }
             }
 
@@ -526,6 +551,7 @@ pub enum SyntaxErr {
     UnknownVariant(Token),
     UnknownField(Token),
     NotAStruct(Token),
-    RecursiveStruct(Token)
+    RecursiveStruct(Token),
+    NotAnArray(Token),
 }
 

@@ -1,5 +1,7 @@
 use crate::definitions::*;
 
+use super::DeclrType;
+
 #[derive(Debug, Clone)]
 pub struct VarData {
     pub name: String,
@@ -20,7 +22,7 @@ pub enum VarType {
     UserStruct(UserStructDef),
     UserEnum(UserEnumDef),
     Void,
-    Array(u16, Box<VarType>)
+    Array(Box<VarType>, u16)
 }
 
 impl VarType {
@@ -43,58 +45,109 @@ impl VarType {
                 sum
             }
             Self::Void => 0,
-            Self::Array(s, _) => *s,
+            Self::Array(t, s) => t.size() * s,
             Self::UserEnum(_) => 1,
             _ => panic!()
 
         }
     }
 
-    pub fn from(t: &str, defined_types: &Vec<UserType>) -> Result<Self, &'static str> {
+    pub fn from_token(s: Token) -> Result<Self, &'static str> {
+        VarType::from(DeclrType::BasicType(s), &vec![])
+    }
+
+    pub fn from(t: DeclrType, defined_types: &Vec<UserType>) -> Result<Self, &'static str> {
         //println!("doing {}", t);
-        match t.to_lowercase().as_str() {
-            "u8" => Ok(Self::U8),
-            "i8" => Ok(Self::I8),
 
-            "u16" => Ok(Self::U16),
-            "i16" => Ok(Self::I16),
-
-            "u32" => Ok(Self::U32),
-            "i32" => Ok(Self::I32),
-
-            "u64" => Ok(Self::U64),
-            "i64" => Ok(Self::I64),
-
-            _ => {
-                if t.len() >= 4 {
-                    if &t[0..4] == "ptr@" {
-                        return Ok(VarType::Pointer(Box::new(VarType::from(&t[4..], defined_types)?)))
-                    }
-                }
-
-                if t == "void" {
-                    return Ok(VarType::Void)
-                }
+        match t {
+            DeclrType::BasicType(o_token) => {
+                let t = o_token.data();
                 
-                for user_type in defined_types.iter().rev() {
-                    match user_type {
-                        UserType::UserStruct(s)  => {
-                            if s.name == t {
-                                return Ok(VarType::UserStruct(s.clone()))
-                            }
-                        }
-
-                        UserType::UserEnum(e) => {
-                            if e.name == t {
-                                return Ok(VarType::UserEnum(e.clone()))
-                            }
+                match t.to_lowercase().as_str() {
+                    "u8" => Ok(Self::U8),
+                    "i8" => Ok(Self::I8),
+        
+                    "u16" => Ok(Self::U16),
+                    "i16" => Ok(Self::I16),
+        
+                    "u32" => Ok(Self::U32),
+                    "i32" => Ok(Self::I32),
+        
+                    "u64" => Ok(Self::U64),
+                    "i64" => Ok(Self::I64),
+        
+                    _ => {
+                        if t == "void" {
+                            return Ok(VarType::Void)
                         }
                         
+                        for user_type in defined_types.iter().rev() {
+                            match user_type {
+                                UserType::UserStruct(s)  => {
+                                    if s.name == t {
+                                        return Ok(VarType::UserStruct(s.clone()))
+                                    }
+                                }
+        
+                                UserType::UserEnum(e) => {
+                                    if e.name == t {
+                                        return Ok(VarType::UserEnum(e.clone()))
+                                    }
+                                }
+                                
+                            }
+                        }
+        
+                        return Err("Undefined Type")
                     }
                 }
-
-                return Err("Undefined Type")
             }
+
+            DeclrType::Array(a_type, a_size) => {
+                let temp = VarType::from(*a_type.clone(), defined_types)?;
+                let a_size_int = match a_size.ttype.data().parse::<u16>() {
+                    Ok(t) => t,
+                    Err(_) => return Err("Cannot Parse Array Size"),
+                };
+                
+                return Ok(VarType::Array(Box::new(temp), a_size_int))
+            }
+
+            DeclrType::Pointer(points_to) => {
+                let temp = VarType::from(*points_to.clone(), defined_types)?;
+                return Ok(VarType::Pointer(Box::new(temp)))
+            }
+        }
+
+        
+    }
+
+    pub fn to_string(&self) -> String {
+        match self.clone() {
+            Self::U8 => "u8".to_string(),
+            Self::I8 => "i8".to_string(),
+            Self::U16 => "u16".to_string(),
+            Self::I16 => "i16".to_string(),
+            Self::U32 => "u32".to_string(),
+            Self::I32 => "i32".to_string(),
+            Self::U64 => "u64".to_string(),
+            Self::I64 => "i64".to_string(),
+
+            Self::Pointer(t) => t.to_string(),
+            Self::Array(t, s) => {
+                let mut temp = String::new();
+                temp.push_str("[");
+                temp.push_str(t.to_string().as_str());
+                temp.push_str(";");
+                temp.push_str(format!("{}",s).as_str());
+                temp.push_str("]");
+                temp
+            }
+
+            Self::UserEnum(e) => e.name,
+            Self::UserStruct(s) => s.name,
+            Self::Void => "void".to_string()
+
         }
     }
 }
@@ -124,14 +177,28 @@ pub struct UserStructDef {
 #[derive(Debug, Clone, PartialEq)]
 pub enum FieldType {
     Defined(VarType),
-    Undefined(Token),
+    Undefined(DeclrType),
 }
 
 impl FieldType {
     pub fn unwrap(&self) -> VarType {
         match self {
             FieldType::Defined(t) => t.clone(),
-            FieldType::Undefined(s) => panic!("Undefined Field Type {}", s.data())
+            FieldType::Undefined(s) => panic!("Undefined Field Type {}", s)
+        }
+    }
+
+    pub fn name_to_string(&self) -> String {
+        match self.clone() {
+            Self::Defined(t) => t.to_string(),
+            Self::Undefined(t) => {
+                if let DeclrType::BasicType(basic) = t {
+                    basic.ttype.data()
+                } else {
+                    //this might need to be changed
+                    "".to_string()
+                }
+            }
         }
     }
 }

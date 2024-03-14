@@ -24,6 +24,7 @@ pub enum PrimaryExpr {
     Id(Token),
     StructField(Token, Token),
     EnumVariant(Token, Token),
+    ArrayAccess(Token, Expr)
 }
 
 #[derive(Clone, Debug)]
@@ -347,6 +348,8 @@ impl Expr {
             }
 
             Expr::Primary(_) => 'b: {
+                
+                //Grouping
                 if let TokenType::ParenOpen = p.peek(0).ttype {
                     let mut e = new_expr("Base");
                     p.advance();
@@ -366,9 +369,8 @@ impl Expr {
 
                 }
 
-
                 //redo this
-                //enum variant
+                //Enum Variant
                 if matches!(p.peek(0).ttype, TokenType::Id(_)) {
                     if let Some(col1) = p.peek_forward(1) {
                         if col1.ttype == TokenType::Col {
@@ -393,23 +395,40 @@ impl Expr {
                 }
                 
                 
-                //structField
+                //Struct Field
                 if matches!(p.peek(0).ttype, TokenType::Id(_)) {
                     if let Some(period) = p.peek_forward(1) {
                         if period.ttype == TokenType::Period {
-                                println!("reached here");
-                                if let Some(id2) = p.peek_forward(2) {
-                                    if matches!(id2.ttype, TokenType::Id(_)) {
-                                        p.advance();
-                                        p.advance();
-                                        p.advance();
-                                        break 'b Expr::Primary(Box::new(PrimaryExpr::StructField(p.peek_forward(-3).unwrap(), p.peek_forward(-1).unwrap())))    
-                                    }
+                            if let Some(id2) = p.peek_forward(2) {
+                                if matches!(id2.ttype, TokenType::Id(_)) {
+                                    p.advance();
+                                    p.advance();
+                                    p.advance();
+                                    break 'b Expr::Primary(Box::new(PrimaryExpr::StructField(p.peek_forward(-3).unwrap(), p.peek_forward(-1).unwrap())))    
                                 }
                             }
                         }
-                        
                     }
+                        
+                }
+
+                //Array Access
+                if matches!(p.peek(0).ttype, TokenType::Id(_)) {
+                    if let Some(forward) = p.peek_forward(1) {
+                        if matches!(forward.ttype, TokenType::SquareOpen) {
+                            let array_name = p.peek(0);
+                            p.advance();
+                            p.advance();
+                            let array_index = new_expr("Base").parse(p)?;
+    
+                            if !matches!(p.peek(0).ttype, TokenType::SquareClose) {
+                                return Err("Expected Closing Square Bracket after Array Access")
+                            }
+                            p.advance();
+                            break 'b Expr::Primary(Box::new(PrimaryExpr::ArrayAccess(array_name, array_index)))
+                        }
+                    }
+                }
 
                 //ID or Literal if this point is reached
                 let e = match p.peek(0).ttype {
@@ -463,7 +482,8 @@ impl std::fmt::Display for Expr {
                     PrimaryExpr::Literal(v) => write!(f, "{}", v.ttype),
                     PrimaryExpr::Id(v) => write!(f, "{}", v.ttype), 
                     PrimaryExpr::EnumVariant(t1, t2) => write!(f, "varint {} of enum {}", t2.ttype,  t1.ttype),
-                    PrimaryExpr::StructField(s, field) => write!(f, "field {} of struct {}", field.ttype, s.ttype)
+                    PrimaryExpr::StructField(s, field) => write!(f, "field {} of struct {}", field.ttype, s.ttype),
+                    PrimaryExpr::ArrayAccess(name, index) => write!(f, "Access of Array {} at index {}", name.ttype, index)
                 }
             }
         }

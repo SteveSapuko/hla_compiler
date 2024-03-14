@@ -1,8 +1,8 @@
-struct Foo {
+struct Test {
     x: u8,
-    y: u16
+    y: u32
 }
 
-let x: Foo;
-x.y = 256;
+let x: [Test; 5];
 
+x[0 as u16];

@@ -9,7 +9,7 @@ pub enum Statement {
     FnDeclr(Box<FnDeclr>),
     StructDeclr(Box<StructDeclr>),
     EnumDeclr(Box<EnumDeclr>),
-    Parameters(Vec<(Token, Token)>), //(name, type)
+    Parameters(Vec<(Token, DeclrType)>), //(name, type)
     Variant(Vec<Token>),
     VarDeclr(VarDeclr),
     Stmt,
@@ -25,15 +25,32 @@ pub enum Statement {
 #[derive(Clone, Debug)]
 pub struct VarDeclr {
     pub name: Token,
-    pub var_type: Token,
+    pub var_type: DeclrType,
     pub value: Option<Expr>
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum DeclrType {
+    BasicType(Token),
+    Array(Box<DeclrType>, Token),
+    Pointer(Box<DeclrType>),
+}
+
+impl DeclrType {
+    pub fn get_token(&self) -> Token {
+        match self.clone() {
+            Self::BasicType(t) => t,
+            Self::Array(t, s) => t.get_token(),
+            Self::Pointer(t) => t.get_token(),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
 pub struct FnDeclr {
     pub name: Token,
     pub params: Statement, //Statement::parameters
-    pub ret_type: Token,
+    pub ret_type: DeclrType,
     pub body: Statement,
 }
 
@@ -64,7 +81,7 @@ pub fn new_statement(t: &'static str) -> Statement{
             Statement::FnDeclr(Box::new(FnDeclr {
                 name: BLANK_TOKEN,
                 params: new_statement("Base"),
-                ret_type: BLANK_TOKEN,
+                ret_type: DeclrType::BasicType(BLANK_TOKEN),
                 body: new_statement("Base") }))
         }
 
@@ -87,7 +104,7 @@ pub fn new_statement(t: &'static str) -> Statement{
         "VarDeclr" => {
             Statement::VarDeclr(VarDeclr {
                 name: BLANK_TOKEN,
-                var_type: BLANK_TOKEN,
+                var_type: DeclrType::BasicType(BLANK_TOKEN),
                 value: None })
         },
         "Stmt" => Statement::Stmt,
@@ -174,11 +191,7 @@ impl Statement {
                 }
                 p.advance();
 
-                if !matches!(p.peek(0).ttype, TokenType::Id(_)) {
-                    return Err("Expected Identifier for Return Type")
-                }
-                let ret_type = p.peek(0);
-                p.advance();
+                let ret_type = parse_type(p)?;
 
                 if p.peek(0).ttype != TokenType::CurlyOpen {
                     return Err("Expected Opening Curly Brace for Function Body")
@@ -276,7 +289,7 @@ impl Statement {
             }
 
             Statement::Parameters(_) => {
-                let mut param_vec: Vec<(Token, Token)> = vec![];
+                let mut param_vec: Vec<(Token, DeclrType)> = vec![];
 
                 if !matches!(p.peek(0).ttype, TokenType::Id(_)) {
                     return Err("Expected Identifier for Parameter Name")
@@ -289,13 +302,9 @@ impl Statement {
                 }
                 p.advance();
 
-                if !matches!(p.peek(0).ttype, TokenType::Id(_)) {
-                    return Err("Expected Identifier for Parameter Type")
-                }
-                let param_type = p.peek(0);
+                let param_type = parse_type(p)?;
                 param_vec.push((param_name, param_type));
                 
-                p.advance();
 
                 while p.peek(0).ttype == TokenType::Comma {
                     p.advance();
@@ -311,13 +320,8 @@ impl Statement {
                     }
                     p.advance();
     
-                    if !matches!(p.peek(0).ttype, TokenType::Id(_)) {
-                        return Err("Expected Identifier for Parameter Type")
-                    }
-                    let param_type = p.peek(0);
+                    let param_type = parse_type(p)?;
                     param_vec.push((param_name, param_type));
-                    
-                    p.advance();   
                 }
 
                 Statement::Parameters(param_vec)
@@ -336,15 +340,7 @@ impl Statement {
                 }
                 p.advance();
 
-                let vtype;
-
-                if matches!(p.peek(0).ttype, TokenType::Id(_)) {
-                    vtype = p.peek(0);
-                } else {
-                    return Err("Expected Identifier as Type for Declaration")
-                }
-
-                p.advance();
+                let vtype = parse_type(p)?;
 
                 let mut value = None;
                 if p.peek(0).ttype == TokenType::Op("=".to_string()) {
@@ -500,6 +496,50 @@ impl Statement {
     }
 }
 
+fn parse_type(p: &mut Parser) -> Result<DeclrType, &'static str> {
+    let vtype;
+    
+    if matches!(p.peek(0).ttype, TokenType::Id(_)) {
+        vtype = DeclrType::BasicType(p.peek(0));
+        p.advance();
+
+    } else if p.peek(0).ttype == TokenType::SquareOpen {
+        p.advance();
+        
+        let array_type = parse_type(p)?;
+
+        if p.peek(0).ttype != TokenType::SemiCol {
+            return Err("Expected Semicolon after Array Type")
+        }
+        p.advance();
+
+        if !matches!(p.peek(0).ttype, TokenType::Lit(_)) {
+            return Err("Expected Literal for Array Size")
+        }
+
+        let array_size = p.peek(0);
+        p.advance();
+        
+        if p.peek(0).ttype != TokenType::SquareClose {
+            return Err("Expected Closing Square Bracket after Array Size")
+        }
+        p.advance();
+
+        vtype = DeclrType::Array(Box::new(array_type), array_size)
+
+    } else if p.peek(0).ttype == TokenType::Key("@".to_string()){
+        p.advance();
+        let points_to_type = parse_type(p)?;
+        return Ok(DeclrType::Pointer(Box::new(points_to_type)))
+
+    } else {
+        return Err("Cannot Parse Type")
+    }
+    
+    
+    Ok(vtype)
+}
+
 impl std::fmt::Display for Statement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.clone() {
@@ -515,16 +555,16 @@ impl std::fmt::Display for Statement {
                 //write!(f, "\n")?;
                 Ok(())
             },
-            Statement::VarDeclr(d) => write!(f, "declare {} type: {} value: {}", d.name.data(), d.var_type.data(), d.value.unwrap_or(new_expr("Base"))),
+            Statement::VarDeclr(d) => write!(f, "declare {} type: {} value: {}", d.name.data(), d.var_type, d.value.unwrap_or(new_expr("Base"))),
             Statement::LoopStmt(d) => write!(f, "Loop {}", *d),
             Statement::IfStmt(d) => write!(f, "If {} then {}\nelse {}", d.cond, d.true_branch, d.false_branch.unwrap_or(new_statement("Base"))),
             Statement::WhileStmt(d) => write!(f, "While {} do {}", d.cond, d.true_branch),
             Statement::BreakStmt(_) => write!(f, "Break"),
-            Statement::FnDeclr(d) => write!(f, "define function: {}   params: {}  \nret type: {}   body: {}", d.name.ttype, d.params, d.ret_type.ttype, d.body),
+            Statement::FnDeclr(d) => write!(f, "define function: {}   params: {}  \nret type: {}   body: {}", d.name.ttype, d.params, d.ret_type, d.body),
             Statement::ReturnStmt(_, d) => write!(f, "return {}", d),
             Statement::Parameters(d) => {
                 for p in d {
-                    write!(f, "\nparam name: {}   param type: {}", p.0.ttype, p.1.ttype)?;
+                    write!(f, "\nparam name: {}   param type: {}", p.0.ttype, p.1)?;
                 }
                 Ok(())
             }
@@ -541,4 +581,13 @@ impl std::fmt::Display for Statement {
     }
 }
 
-//_ => panic!("implement stmt display")
+
+impl std::fmt::Display for DeclrType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.clone() {
+            DeclrType::BasicType(t) => write!(f, "{}", t.ttype),
+            DeclrType::Array(t, s) => write!(f, "Array of type: {} Size: {}", t, s.ttype),
+            DeclrType::Pointer(t) => write!(f, "Pointer at {}", *t),
+        }
+    }
+}

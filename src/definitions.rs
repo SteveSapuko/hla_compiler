@@ -71,7 +71,7 @@ impl std::fmt::Display for TokenType {
 }
 
 impl Statement {
-    pub fn get_param_vec(&self) -> Vec<(Token, Token)> {
+    pub fn get_param_vec(&self) -> Vec<(Token, DeclrType)> {
         match self {
             Self::Parameters(d) => d.clone(),
             
