@@ -64,7 +64,6 @@ impl Lexer {
         let mut token_list: Vec<Token> = vec![];
 
         while self.data.as_bytes()[self.ptr] != b'\0' {
-            //self.ptr = self.skip_whitespace()?;
             self.skip_whitespace();
 
             //println!("ptr: {}   char: {}", self.ptr, self.data.as_bytes()[self.ptr] as char);
